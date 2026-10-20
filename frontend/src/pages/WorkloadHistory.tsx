@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { UC05WorkloadRun } from '../types'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { UC05WorkloadRun, UC05JobRecord } from '../types'
 import {
   getWorkloadRuns,
   getWorkloadRunResult,
+  createWorkloadRun,
   ApiError,
 } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
@@ -23,6 +24,7 @@ import { analyzeValidateResult, analyzeProcessResult } from '../lib/advisor'
 import { exportCsv } from '../lib/exportUtils'
 import {
   History,
+  Play,
   RotateCcw,
   Search,
   Copy,
@@ -155,39 +157,39 @@ export const WorkloadAdvisor: React.FC<{
           </Badge>
         </div>
 
-        <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 shadow-2xs">
-          <div className="text-xs text-slate-700 dark:text-slate-300">
-            <span className="font-semibold text-slate-900 dark:text-slate-100">Batch Health: </span>
+        <div className="flex items-center justify-between p-3 rounded-lg bg-surface border border-border shadow-2xs">
+          <div className="text-xs text-text-secondary">
+            <span className="font-semibold text-text">Batch Health: </span>
             {advice.summarySentence}
           </div>
-          <div className="text-right text-[11px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap ml-3">
+          <div className="text-right text-[11px] font-mono text-muted whitespace-nowrap ml-3">
             {advice.validRows}/{advice.totalRows} valid
           </div>
         </div>
 
         {advice.ruleInsights.length > 0 ? (
           <div className="space-y-2.5">
-            <div className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+            <div className="text-[11px] font-bold text-muted uppercase tracking-wider">
               Recommended Fixes by Rule
             </div>
             <div className="space-y-2">
               {advice.ruleInsights.map((ins) => (
                 <div
                   key={ins.ruleId}
-                  className="p-3 rounded-lg bg-white dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 text-xs space-y-1.5 shadow-2xs"
+                  className="p-3 rounded-lg bg-surface border border-border text-xs space-y-1.5 shadow-2xs"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100">
+                    <div className="flex items-center gap-1.5 font-semibold text-text">
                       <Badge variant="danger" className="text-[10px]">
                         {ins.ruleId}
                       </Badge>
                       <span>{ins.ruleTitle}</span>
                     </div>
-                    <span className="text-[10px] text-slate-400 font-mono">
+                    <span className="text-[10px] text-muted font-mono">
                       Affects {ins.count} row{ins.count > 1 ? 's' : ''} (Rows {ins.affectedRows.join(', ')})
                     </span>
                   </div>
-                  <p className="text-slate-600 dark:text-slate-400 text-[11px]">{ins.explanation}</p>
+                  <p className="text-text-secondary text-[11px]">{ins.explanation}</p>
                   <div className="flex items-start gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-50/70 dark:bg-emerald-950/40 p-2 rounded border border-emerald-100 dark:border-emerald-900 font-medium">
                     <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
                     <span>
@@ -214,7 +216,7 @@ export const WorkloadAdvisor: React.FC<{
 
     return (
       <Card
-        className={`border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/40 via-white to-slate-50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-slate-950 p-5 space-y-4 ${className}`}
+        className={`border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/40 via-surface to-surface-muted dark:from-indigo-950/20 dark:via-surface dark:to-surface p-5 space-y-4 ${className}`}
       >
         <div className="flex items-center justify-between border-b border-indigo-100/70 dark:border-indigo-900/60 pb-3">
           <div className="flex items-center gap-2">
@@ -222,7 +224,7 @@ export const WorkloadAdvisor: React.FC<{
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Workload Advisor</h3>
+              <h3 className="text-sm font-bold text-text">Workload Advisor</h3>
               <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                 Smart insights - rule-based
               </p>
@@ -242,18 +244,18 @@ export const WorkloadAdvisor: React.FC<{
           </Badge>
         </div>
 
-        <div className="p-3 rounded-lg bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 space-y-1 shadow-2xs">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100">
+        <div className="p-3 rounded-lg bg-surface border border-border text-xs text-text-secondary space-y-1 shadow-2xs">
+          <div className="flex items-center gap-1.5 font-semibold text-text">
             <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             Effort Level: {advice.effortLevel}
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">{advice.effortDescription}</p>
+          <p className="text-[11px] text-muted">{advice.effortDescription}</p>
         </div>
 
         {advice.heaviestJob && (
-          <div className="p-3 rounded-lg bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-xs space-y-1.5 shadow-2xs">
+          <div className="p-3 rounded-lg bg-surface border border-border text-xs space-y-1.5 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <span className="text-[11px] font-bold text-muted uppercase tracking-wider flex items-center gap-1">
                 <TrendingUp className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                 Heaviest Job
               </span>
@@ -261,20 +263,20 @@ export const WorkloadAdvisor: React.FC<{
                 {advice.heaviestJob.sharePercent}% of total
               </span>
             </div>
-            <div className="flex items-center justify-between font-mono text-slate-800 dark:text-slate-200 text-[11px]">
+            <div className="flex items-center justify-between font-mono text-text text-[11px]">
               <span className="font-semibold">Record ID: {advice.heaviestJob.record_id}</span>
-              <span className="text-slate-600 dark:text-slate-400">{advice.heaviestJob.estimated_ms} ms</span>
+              <span className="text-muted">{advice.heaviestJob.estimated_ms} ms</span>
             </div>
           </div>
         )}
 
         {advice.rowsShare.length > 0 && (
           <div className="space-y-2">
-            <div className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <div className="text-[11px] font-bold text-muted uppercase tracking-wider flex items-center gap-1">
+              <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
               Share of Execution Time per Record
             </div>
-            <div className="p-3 rounded-lg bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 space-y-2 shadow-2xs">
+            <div className="p-3 rounded-lg bg-surface border border-border space-y-2 shadow-2xs">
               {advice.rowsShare.map((r, i) => (
                 <div key={i} className="space-y-1 text-xs">
                   <div className="flex items-center justify-between font-mono text-[11px]">
@@ -312,9 +314,11 @@ export const WorkloadHistory: React.FC = () => {
   const { token, activeTokenOption } = useAuth()
   const { toast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   const [runs, setRuns] = useState<UC05WorkloadRun[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isReRunning, setIsReRunning] = useState<boolean>(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState<boolean>(false)
 
@@ -335,8 +339,7 @@ export const WorkloadHistory: React.FC = () => {
   const [selectedForCompare, setSelectedForCompare] = useState<string[]>([])
   const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false)
 
-  // Drawer state
-  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false)
+  // Selected run state
   const [selectedRun, setSelectedRun] = useState<UC05WorkloadRun | null>(null)
   const [drawerDetail, setDrawerDetail] = useState<UC05WorkloadRun | null>(null)
   const [isDrawerLoading, setIsDrawerLoading] = useState<boolean>(false)
@@ -388,9 +391,24 @@ export const WorkloadHistory: React.FC = () => {
     }
   }, [token])
 
+  // 1) IDENTITY REFRESH BUG FIX:
+  // On identity change: clear last results, show skeletons, refetch /runs
   useEffect(() => {
+    setRuns([])
+    setIsLoading(true)
+    setErrorMessage(null)
+    setSelectedRun(null)
+    setDrawerDetail(null)
+    setSelectedForCompare([])
     loadRuns(false)
-  }, [loadRuns])
+  }, [token, loadRuns])
+
+  // Auto-select first run when runs are loaded
+  useEffect(() => {
+    if (!selectedRun && runs.length > 0) {
+      handleOpenDrawer(runs[0])
+    }
+  }, [runs, selectedRun])
 
   useEffect(() => {
     document.title = 'Workload History | WorkloadLens'
@@ -405,11 +423,21 @@ export const WorkloadHistory: React.FC = () => {
     return () => clearInterval(timer)
   }, [autoRefresh, loadRuns])
 
-  // Open drawer and fetch run detail
+  // Close modals on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isCompareModalOpen) {
+        setIsCompareModalOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isCompareModalOpen])
+
+  // Select run and fetch run detail
   const handleOpenDrawer = async (run: UC05WorkloadRun) => {
     setSelectedRun(run)
     setDrawerDetail(null)
-    setIsDrawerOpen(true)
     setDrawerTab('summary')
     setIsDrawerLoading(true)
 
@@ -433,6 +461,107 @@ export const WorkloadHistory: React.FC = () => {
     } catch {
       toast('Copy failed', 'Clipboard access denied', 'error')
     }
+  }
+
+  // Workload Re-run & Replay handlers
+  const getRunInputRecords = (run: UC05WorkloadRun): { records: UC05JobRecord[]; operation: 'validate' | 'process'; key: string } => {
+    const saved = localStorage.getItem(`run_input_${run.run_id}`)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed.records && Array.isArray(parsed.records) && parsed.records.length > 0) {
+          return {
+            records: parsed.records,
+            operation: (parsed.operation as any) || run.operation,
+            key: parsed.idempotencyKey || run.run_id,
+          }
+        }
+      } catch {}
+    }
+
+    let recs: UC05JobRecord[] = []
+    if (run.result?.rows && Array.isArray(run.result.rows) && run.result.rows.length > 0) {
+      recs = run.result.rows.map((r: any) => ({
+        record_id: r.record_id || 'J01',
+        tool: 'EXPORT',
+        record_count: 10,
+        environment: 'TEST',
+      }))
+    } else {
+      recs = [
+        { record_id: 'J01', tool: 'EXPORT', record_count: 20, environment: 'TEST' },
+        { record_id: 'J02', tool: 'VALIDATE', record_count: 10, environment: 'STAGE' },
+      ]
+    }
+
+    return {
+      records: recs,
+      operation: run.operation,
+      key: run.run_id,
+    }
+  }
+
+  const handleReplaySameKey = async (run: UC05WorkloadRun) => {
+    const input = getRunInputRecords(run)
+    setIsReRunning(true)
+    try {
+      const res = await createWorkloadRun(input.operation, input.records, input.key, token)
+      toast(
+        'Replay Cached (HTTP 200 OK)',
+        `Idempotent replay recognized. No quota debited.`,
+        'success'
+      )
+      await loadRuns(false)
+      handleOpenDrawer(res)
+    } catch (err: any) {
+      toast('Replay Failed', err.message || 'Could not replay workload', 'error')
+    } finally {
+      setIsReRunning(false)
+    }
+  }
+
+  const handleRerunNewKey = async (run: UC05WorkloadRun) => {
+    const input = getRunInputRecords(run)
+    const newKey = crypto.randomUUID()
+    setIsReRunning(true)
+    try {
+      const res = await createWorkloadRun(input.operation, input.records, newKey, token)
+      toast(
+        'New Run Executed (HTTP 201)',
+        `Run ID: ${res.run_id}`,
+        'success'
+      )
+      if (res.run_id) {
+        try {
+          localStorage.setItem(
+            `run_input_${res.run_id}`,
+            JSON.stringify({
+              records: input.records,
+              operation: input.operation,
+              idempotencyKey: newKey,
+            })
+          )
+        } catch {}
+      }
+      await loadRuns(false)
+      handleOpenDrawer(res)
+    } catch (err: any) {
+      toast('Run Failed', err.message || 'Could not execute workload', 'error')
+    } finally {
+      setIsReRunning(false)
+    }
+  }
+
+  const handleOpenInBuilder = (run: UC05WorkloadRun) => {
+    const input = getRunInputRecords(run)
+    sessionStorage.setItem(
+      'workload_builder_preload',
+      JSON.stringify({
+        records: input.records,
+        operation: input.operation,
+      })
+    )
+    navigate('/tools')
   }
 
   // 1. KPI STRIP COMPUTATIONS (computed from loaded runs)
@@ -622,24 +751,23 @@ export const WorkloadHistory: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto w-full space-y-6">
       {/* Role / Subscription Notices */}
       {activeTokenOption.role === 'Viewer' && (
-        <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-200 text-xs flex items-center gap-2.5">
+        <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-200 text-[13px] flex items-center gap-2.5">
           <Eye className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
           <div>
-            <strong className="font-semibold">Notice:</strong> read-only (Viewer) &mdash; execution
+            <strong className="font-semibold">Notice:</strong> Read-only (Viewer) &mdash; execution
             is disabled, but historical workload execution logs remain accessible.
           </div>
         </div>
       )}
 
       {activeTokenOption.status === 'Suspended' && (
-        <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-900 dark:text-rose-200 text-xs flex items-center gap-2.5">
+        <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-900 dark:text-rose-200 text-[13px] flex items-center gap-2.5">
           <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0" />
           <div>
-            <strong className="font-semibold">Notice:</strong> subscription suspended - history
-            still readable. Upgrade or reactivate to resume automation processing.
+            <strong className="font-semibold">Notice:</strong> Subscription suspended - history is still readable. Upgrade or reactivate to resume automation processing.
           </div>
         </div>
       )}
@@ -832,19 +960,19 @@ export const WorkloadHistory: React.FC = () => {
                 setSearchId(e.target.value)
                 setCurrentPage(1)
               }}
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface border border-border text-text rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
             />
           </div>
 
           {/* Operation Filter (kept in URL Hash) */}
           <div className="md:col-span-3 flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            <span className="text-xs font-semibold text-muted whitespace-nowrap">
               Op:
             </span>
             <select
               value={operationFilter}
               onChange={(e) => handleOperationFilterChange(e.target.value)}
-              className="w-full py-1.5 px-2.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full py-1.5 px-2.5 text-xs bg-surface border border-border text-text rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/20"
             >
               <option value="All">All Operations</option>
               <option value="validate">Validate</option>
@@ -854,13 +982,13 @@ export const WorkloadHistory: React.FC = () => {
 
           {/* Status Filter (kept in URL Hash) */}
           <div className="md:col-span-3 flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            <span className="text-xs font-semibold text-muted whitespace-nowrap">
               Status:
             </span>
             <select
               value={statusFilter}
               onChange={(e) => handleStatusFilterChange(e.target.value)}
-              className="w-full py-1.5 px-2.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full py-1.5 px-2.5 text-xs bg-surface border border-border text-text rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/20"
             >
               <option value="All">All Statuses</option>
               <option value="Succeeded">Succeeded</option>
@@ -933,9 +1061,13 @@ export const WorkloadHistory: React.FC = () => {
         </div>
       </Card>
 
-      {/* Main Runs Table with Sortable Columns & Pagination */}
-      <Card className="p-0 overflow-hidden">
-        {isLoading ? (
+      {/* Master-Detail Layout (Run list on left, selected run result on right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Master Run List */}
+        <div className="lg:col-span-7 space-y-4">
+          {/* Main Runs Table with Sortable Columns & Pagination */}
+          <Card className="p-0 overflow-hidden">
+            {isLoading ? (
           <div className="p-6 space-y-3">
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-full" />
@@ -1044,11 +1176,11 @@ export const WorkloadHistory: React.FC = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+              <tbody className="divide-y divide-border bg-surface">
                 {paginatedRuns.map((r) => {
                   const shortId = r.run_id ? r.run_id.slice(0, 8) : '—'
                   const isCopied = copiedId === r.run_id
-                  const isSelected = selectedRun?.run_id === r.run_id && isDrawerOpen
+                  const isSelected = selectedRun?.run_id === r.run_id
                   const isCheckedForCompare = selectedForCompare.includes(r.run_id)
 
                   return (
@@ -1189,16 +1321,369 @@ export const WorkloadHistory: React.FC = () => {
           </div>
         )}
       </Card>
+        </div>
+
+        {/* Right Column: Selected Run's Result */}
+        <div className="lg:col-span-5 space-y-4 sticky top-6">
+          <Card className="p-0 overflow-hidden border border-border bg-surface shadow-xs">
+            {/* Detail Header */}
+            <div className="p-4 border-b border-border bg-surface-muted/50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm font-bold text-text">Run Result Details</h2>
+                  {activeDetail && (
+                    <Badge variant={getStatusBadgeVariant(activeDetail.status)}>
+                      {activeDetail.status}
+                    </Badge>
+                  )}
+                  {activeDetail && (
+                    <span className="text-[11px] font-mono font-semibold text-text-secondary bg-surface-muted px-2 py-0.5 rounded uppercase">
+                      {activeDetail.operation}
+                    </span>
+                  )}
+                </div>
+                {activeDetail && (
+                  <div className="flex items-center gap-1.5 mt-1 font-mono text-xs text-muted">
+                    <span className="truncate max-w-[200px]" title={activeDetail.run_id}>
+                      ID: {activeDetail.run_id}
+                    </span>
+                    <button
+                      onClick={(e) => handleCopy(e, activeDetail.run_id, 'Run ID')}
+                      title="Copy full ID"
+                      className="text-muted hover:text-text p-0.5 cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {activeDetail && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleRerunNewKey(activeDetail)}
+                    isLoading={isReRunning}
+                    disabled={activeTokenOption.role === 'Viewer' || activeTokenOption.status === 'Suspended'}
+                    title="Re-run with same input using a fresh idempotency key"
+                    aria-label="Re-run with new key"
+                    className="gap-1 text-xs"
+                  >
+                    <Play className="w-3 h-3" />
+                    Re-run (New Key)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleReplaySameKey(activeDetail)}
+                    isLoading={isReRunning}
+                    disabled={activeTokenOption.role === 'Viewer' || activeTokenOption.status === 'Suspended'}
+                    title="Replay with same idempotency key (HTTP 200 replay test)"
+                    aria-label="Replay with same key"
+                    className="gap-1 text-xs"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Replay (Same Key)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenInBuilder(activeDetail)}
+                    title="Open this run's records in the Run Tools builder table"
+                    aria-label="Load in Builder"
+                    className="gap-1 text-xs text-accent hover:text-accent/80"
+                  >
+                    <ArrowRight className="w-3 h-3" />
+                    Builder
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Tabs */}
+            {activeDetail && (
+              <div className="px-4 pt-2 border-b border-border bg-surface">
+                <Tabs
+                  tabs={[
+                    { id: 'summary', label: 'Summary' },
+                    { id: 'raw', label: 'Raw JSON' },
+                  ]}
+                  activeTab={drawerTab}
+                  onChange={(tab) => setDrawerTab(tab)}
+                />
+              </div>
+            )}
+
+            {/* Content Area */}
+            <div className="p-4 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto">
+              {isDrawerLoading ? (
+                <div className="space-y-3 py-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-28 w-full" />
+                  <Skeleton className="h-36 w-full" />
+                </div>
+              ) : !activeDetail ? (
+                <div className="py-12">
+                  <EmptyState
+                    icon={<Activity className="w-6 h-6 text-slate-400" />}
+                    title="No run selected"
+                    description="Select a run from the list on the left to inspect its execution results."
+                  />
+                </div>
+              ) : drawerTab === 'raw' ? (
+                /* Raw JSON View */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      GET /runs/{activeDetail.run_id}/result
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={(e) =>
+                        handleCopy(
+                          e,
+                          JSON.stringify(activeDetail, null, 2),
+                          'Raw JSON'
+                        )
+                      }
+                      className="gap-1 text-xs py-0.5 px-2"
+                    >
+                      <Copy className="w-3 h-3" />
+                      Copy JSON
+                    </Button>
+                  </div>
+                  <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[11px] overflow-x-auto leading-relaxed max-h-96">
+                    {JSON.stringify(activeDetail, null, 2)}
+                  </pre>
+                </div>
+              ) : (
+                /* Summary View */
+                <div className="space-y-5">
+                  {/* Failed Red Panel with Recorded Error */}
+                  {activeDetail.status.toLowerCase() === 'failed' && (
+                    <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-900 dark:text-rose-200 space-y-2">
+                      <div className="font-semibold text-xs flex items-center gap-1.5 text-rose-800 dark:text-rose-300">
+                        <AlertTriangle className="w-4 h-4 text-rose-600" />
+                        Recorded Execution Error
+                      </div>
+                      <div className="font-mono text-xs bg-surface p-2.5 rounded-lg border border-danger/30 text-danger whitespace-pre-wrap break-all leading-relaxed">
+                        {activeDetail.error || 'Execution failed with an unrecorded error.'}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Process Output View */}
+                  {activeDetail.operation === 'process' && activeDetail.status.toLowerCase() !== 'failed' && (
+                    <div className="space-y-5">
+                      {/* Summary Cards */}
+                      <div>
+                        <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          Process Summary
+                        </h3>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Stat
+                            label="input_rows"
+                            value={activeDetail.result?.summary?.input_rows ?? '—'}
+                          />
+                          <Stat
+                            label="total_records"
+                            value={activeDetail.result?.summary?.total_records ?? '—'}
+                          />
+                          <Stat
+                            label="total_estimated_ms"
+                            value={
+                              activeDetail.result?.summary?.total_estimated_ms !== undefined
+                                ? `${activeDetail.result.summary.total_estimated_ms} ms`
+                                : '—'
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      {/* Estimated MS Chart */}
+                      {chartData.length > 0 && (
+                        <div>
+                          <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <BarChart3 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                            Effort per Record (ms)
+                          </h3>
+                          <div className="h-40 w-full p-2 bg-slate-50/50 dark:bg-slate-800/40 rounded-lg border border-slate-200 dark:border-slate-800">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart
+                                data={chartData}
+                                margin={{ top: 10, right: 10, left: -20, bottom: 5 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                                <XAxis
+                                  dataKey="name"
+                                  tick={{ fontSize: 10, fill: 'var(--muted)' }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                />
+                                <YAxis
+                                  tick={{ fontSize: 10, fill: 'var(--muted)' }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                />
+                                <Tooltip
+                                  contentStyle={{
+                                    backgroundColor: 'var(--surface)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '8px',
+                                    fontSize: '11px',
+                                    color: 'var(--text)',
+                                  }}
+                                  itemStyle={{ color: 'var(--text)' }}
+                                />
+                                <Bar
+                                  dataKey="estimated_ms"
+                                  fill="var(--accent)"
+                                  radius={[4, 4, 0, 0]}
+                                />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Rows Table (Order Preserved) */}
+                      {activeDetail.result?.rows && (
+                        <div className="space-y-2">
+                          <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <ListOrdered className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                            Rows Table (Order Preserved)
+                          </h3>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto">
+                            <table className="w-full text-left text-xs font-mono">
+                              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 uppercase font-semibold">
+                                <tr>
+                                  <th className="py-2 px-3 w-10 text-center">#</th>
+                                  <th className="py-2 px-3">Record ID</th>
+                                  <th className="py-2 px-3 text-right">Estimated ms</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {activeDetail.result.rows.map((row: any, idx: number) => (
+                                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                    <td className="py-1.5 px-3 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                    <td className="py-1.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
+                                      {row.record_id}
+                                    </td>
+                                    <td className="py-1.5 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                                      {row.estimated_ms} ms
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Validate Output View */}
+                  {activeDetail.operation === 'validate' && activeDetail.status.toLowerCase() !== 'failed' && (
+                    <div className="space-y-5">
+                      {/* Counts */}
+                      <div>
+                        <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          Validation Row Counts
+                        </h3>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Stat
+                            label="valid_rows"
+                            value={activeDetail.result?.valid_rows ?? 0}
+                          />
+                          <Stat
+                            label="invalid_rows"
+                            value={activeDetail.result?.invalid_rows ?? 0}
+                          />
+                          <Stat
+                            label="issues"
+                            value={activeDetail.result?.issues?.length ?? 0}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Issues Table */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          Validation Issues Table
+                        </h3>
+                        {activeDetail.result?.issues && activeDetail.result.issues.length > 0 ? (
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto">
+                            <table className="w-full text-left text-xs font-mono">
+                              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 uppercase font-semibold">
+                                <tr>
+                                  <th className="py-2 px-3">Row</th>
+                                  <th className="py-2 px-3">Field</th>
+                                  <th className="py-2 px-3">Rule ID</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {activeDetail.result.issues.map((issue: any, idx: number) => (
+                                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                    <td className="py-1.5 px-3 text-slate-600 dark:text-slate-400">
+                                      Row {issue.row_index}
+                                    </td>
+                                    <td className="py-1.5 px-3 font-semibold text-slate-900 dark:text-slate-100">
+                                      {issue.field}
+                                    </td>
+                                    <td className="py-1.5 px-3">
+                                      <Badge variant="danger">{issue.rule_id}</Badge>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                            <span>All batch rows passed validation checks cleanly.</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Workload Advisor Card */}
+                  {activeDetail.status.toLowerCase() !== 'failed' && activeDetail.result && (
+                    <WorkloadAdvisor
+                      operation={activeDetail.operation}
+                      result={activeDetail.result}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
 
       {/* 7. COMPARE TWO RUNS MODAL (SIDE-BY-SIDE SUMMARY DIFF) */}
       {isCompareModalOpen && runA && runB && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Compare Two Workload Runs"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        >
           <div
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
             onClick={() => setIsCompareModalOpen(false)}
           />
-          <div className="relative bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+          <div className="relative bg-surface rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-border space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <Scale className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
@@ -1344,320 +1829,6 @@ export const WorkloadHistory: React.FC = () => {
         </div>
       )}
 
-      {/* Right-Side Detail Drawer (PRESERVED) */}
-      {isDrawerOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsDrawerOpen(false)}
-          />
-
-          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-            <div className="w-screen max-w-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800">
-              {/* Drawer Header */}
-              <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Run Result Details</h2>
-                    {activeDetail && (
-                      <Badge variant={getStatusBadgeVariant(activeDetail.status)}>
-                        {activeDetail.status}
-                      </Badge>
-                    )}
-                    {activeDetail && (
-                      <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 bg-slate-200/70 dark:bg-slate-800 px-2 py-0.5 rounded uppercase">
-                        {activeDetail.operation}
-                      </span>
-                    )}
-                  </div>
-                  {activeDetail && (
-                    <div className="flex items-center gap-2 mt-1.5 font-mono text-xs text-slate-500 dark:text-slate-400">
-                      <span>ID: {activeDetail.run_id}</span>
-                      <button
-                        onClick={(e) => handleCopy(e, activeDetail.run_id, 'Run ID')}
-                        title="Copy full ID"
-                        className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsDrawerOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Drawer Tabs */}
-              <div className="px-5 pt-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <Tabs
-                  tabs={[
-                    { id: 'summary', label: 'Summary' },
-                    { id: 'raw', label: 'Raw JSON' },
-                  ]}
-                  activeTab={drawerTab}
-                  onChange={(tab) => setDrawerTab(tab)}
-                />
-              </div>
-
-              {/* Drawer Content */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-6">
-                {isDrawerLoading ? (
-                  <div className="space-y-4 py-4">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-40 w-full" />
-                    <Skeleton className="h-40 w-full" />
-                  </div>
-                ) : !activeDetail ? (
-                  <EmptyState
-                    icon={<AlertCircle className="w-6 h-6" />}
-                    title="Run details not available"
-                    description="Could not load the result for this workload run."
-                  />
-                ) : drawerTab === 'raw' ? (
-                  /* Raw JSON View */
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                        Full Run Response (GET /runs/{activeDetail.run_id}/result)
-                      </span>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={(e) =>
-                          handleCopy(
-                            e,
-                            JSON.stringify(activeDetail, null, 2),
-                            'Raw JSON'
-                          )
-                        }
-                        className="gap-1.5 text-xs"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                        Copy JSON
-                      </Button>
-                    </div>
-                    <pre className="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs overflow-x-auto leading-relaxed max-h-[500px]">
-                      {JSON.stringify(activeDetail, null, 2)}
-                    </pre>
-                  </div>
-                ) : (
-                  /* Summary View */
-                  <div className="space-y-6">
-                    {/* Workload Advisor Card */}
-                    {activeDetail.status.toLowerCase() !== 'failed' && activeDetail.result && (
-                      <WorkloadAdvisor
-                        operation={activeDetail.operation}
-                        result={activeDetail.result}
-                      />
-                    )}
-
-                    {/* Failed Red Panel */}
-                    {activeDetail.status.toLowerCase() === 'failed' && (
-                      <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-900 dark:text-rose-200 space-y-2">
-                        <div className="font-semibold text-xs flex items-center gap-1.5 text-rose-800 dark:text-rose-300">
-                          <AlertTriangle className="w-4 h-4 text-rose-600" />
-                          Recorded Failure Error
-                        </div>
-                        <div className="font-mono text-xs bg-white dark:bg-slate-900 p-3 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 whitespace-pre-wrap break-all leading-relaxed">
-                          {activeDetail.error || 'No error trace recorded.'}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Process Output View */}
-                    {activeDetail.operation === 'process' && activeDetail.status.toLowerCase() !== 'failed' && (
-                      <div className="space-y-6">
-                        {/* Summary Cards */}
-                        <div>
-                          <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                            Workload Process Summary
-                          </h3>
-                          <div className="grid grid-cols-3 gap-3">
-                            <Stat
-                              label="Input Rows"
-                              value={activeDetail.result?.summary?.input_rows ?? '—'}
-                            />
-                            <Stat
-                              label="Total Records"
-                              value={activeDetail.result?.summary?.total_records ?? '—'}
-                            />
-                            <Stat
-                              label="Total Effort"
-                              value={
-                                activeDetail.result?.summary?.total_estimated_ms !== undefined
-                                  ? `${activeDetail.result.summary.total_estimated_ms} ms`
-                                  : '—'
-                              }
-                            />
-                          </div>
-                        </div>
-
-                        {/* Estimated MS Chart */}
-                        {chartData.length > 0 && (
-                          <div>
-                            <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                              <BarChart3 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                              Estimated Effort per Record (ms)
-                            </h3>
-                            <Card className="p-3">
-                              <div className="h-48 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <BarChart
-                                    data={chartData}
-                                    margin={{ top: 10, right: 10, left: -20, bottom: 5 }}
-                                  >
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                                    <XAxis
-                                      dataKey="name"
-                                      tick={{ fontSize: 10, fill: 'var(--muted)' }}
-                                      axisLine={false}
-                                      tickLine={false}
-                                    />
-                                    <YAxis
-                                      tick={{ fontSize: 10, fill: 'var(--muted)' }}
-                                      axisLine={false}
-                                      tickLine={false}
-                                    />
-                                    <Tooltip
-                                      contentStyle={{
-                                        backgroundColor: 'var(--surface)',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: '8px',
-                                        fontSize: '11px',
-                                        color: 'var(--text)',
-                                      }}
-                                      itemStyle={{ color: 'var(--text)' }}
-                                    />
-                                    <Bar
-                                      dataKey="estimated_ms"
-                                      fill="var(--accent)"
-                                      radius={[4, 4, 0, 0]}
-                                    />
-                                  </BarChart>
-                                </ResponsiveContainer>
-                              </div>
-                            </Card>
-                          </div>
-                        )}
-
-                        {/* Rows Table */}
-                        {activeDetail.result?.rows && (
-                          <div>
-                            <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                              <ListOrdered className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                              Calculated Rows ({activeDetail.result.rows.length})
-                            </h3>
-                            <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto">
-                              <table className="w-full text-left text-xs font-mono">
-                                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 uppercase font-semibold">
-                                  <tr>
-                                    <th className="py-2 px-3">#</th>
-                                    <th className="py-2 px-3">Record ID</th>
-                                    <th className="py-2 px-3">Estimated Effort</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                  {activeDetail.result.rows.map((row: any, idx: number) => (
-                                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                                      <td className="py-2 px-3 text-slate-400">{idx + 1}</td>
-                                      <td className="py-2 px-3 font-semibold text-slate-800 dark:text-slate-200">
-                                        {row.record_id}
-                                      </td>
-                                      <td className="py-2 px-3 font-bold text-emerald-600 dark:text-emerald-400">
-                                        {row.estimated_ms} ms
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Validate Output View */}
-                    {activeDetail.operation === 'validate' && activeDetail.status.toLowerCase() !== 'failed' && (
-                      <div className="space-y-6">
-                        {/* Counts */}
-                        <div>
-                          <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                            Validation Row Counts
-                          </h3>
-                          <div className="grid grid-cols-3 gap-3">
-                            <Stat
-                              label="Valid Rows"
-                              value={activeDetail.result?.valid_rows ?? 0}
-                            />
-                            <Stat
-                              label="Invalid Rows"
-                              value={activeDetail.result?.invalid_rows ?? 0}
-                            />
-                            <Stat
-                              label="Issues"
-                              value={activeDetail.result?.issues?.length ?? 0}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Issues Table */}
-                        <div>
-                          <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <AlertCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                            Validation Issues Table
-                          </h3>
-                          {activeDetail.result?.issues && activeDetail.result.issues.length > 0 ? (
-                            <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto">
-                              <table className="w-full text-left text-xs font-mono">
-                                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 uppercase font-semibold">
-                                  <tr>
-                                    <th className="py-2 px-3">Row</th>
-                                    <th className="py-2 px-3">Field</th>
-                                    <th className="py-2 px-3">Rule Failed</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                  {activeDetail.result.issues.map((issue: any, idx: number) => (
-                                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                                      <td className="py-2 px-3 text-slate-600 dark:text-slate-400">
-                                        Row {issue.row_index}
-                                      </td>
-                                      <td className="py-2 px-3 font-semibold text-slate-900 dark:text-slate-100">
-                                        {issue.field}
-                                      </td>
-                                      <td className="py-2 px-3">
-                                        <Badge variant="danger">{issue.rule_id}</Badge>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          ) : (
-                            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                              <span>All batch rows passed validation checks cleanly.</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

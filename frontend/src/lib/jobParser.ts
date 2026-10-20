@@ -2,9 +2,9 @@ import { UC05JobRecord } from '../types'
 
 export interface ParsedJobClause {
   record_id: string
-  tool: 'EXPORT' | 'VALIDATE'
-  record_count: number
-  environment: 'TEST' | 'STAGE'
+  tool: 'EXPORT' | 'VALIDATE' | string
+  record_count: number | string
+  environment: 'TEST' | 'STAGE' | string
   rawClause: string
 }
 
@@ -49,7 +49,7 @@ export function parseJobsFromText(
   const seenIds = new Set<string>()
 
   for (const clause of rawClauses) {
-    // 1. Tool extraction: must explicitly be EXPORT or VALIDATE
+    // 1. Tool extraction: must explicitly be EXPORT or VALIDATE (trimmed)
     let tool: 'EXPORT' | 'VALIDATE' | null = null
     if (/\bexport\b/i.test(clause)) {
       tool = 'EXPORT'
@@ -64,28 +64,41 @@ export function parseJobsFromText(
       continue
     }
 
-    // 2. Count extraction: look for positive integer
-    const countMatch = clause.match(/\b(\d+)\s*(?:records?|rows?|items?|jobs?)?\b/i)
-    let recordCount: number | null = null
-    if (countMatch && countMatch[1]) {
-      const parsedCount = parseInt(countMatch[1], 10)
-      if (!isNaN(parsedCount) && parsedCount > 0) {
-        recordCount = parsedCount
+    // 2. Count extraction:
+    // Extract count token (e.g. "export 250 records", "validate 40 in test", "export 25.5 records")
+    let rawCountToken: string | null = null
+    const recordsMatch = clause.match(/\b([^\s;]+)\s+(?:records?|rows?|items?|jobs?)\b/i)
+    const countPrefixMatch = clause.match(/\b(?:count|records?|rows?)[:\s]+([^\s;]+)/i)
+    const afterToolMatch = clause.match(/\b(?:export|validate)\s+([^\s;]+)/i)
+
+    if (
+      recordsMatch &&
+      recordsMatch[1] &&
+      !/^(?:export|validate|in|on|at|as|stage|test|prod)$/i.test(recordsMatch[1])
+    ) {
+      rawCountToken = recordsMatch[1].trim()
+    } else if (countPrefixMatch && countPrefixMatch[1]) {
+      rawCountToken = countPrefixMatch[1].trim()
+    } else if (
+      afterToolMatch &&
+      afterToolMatch[1] &&
+      !/^(?:in|on|at|as|stage|test|prod|records?|rows?|items?|jobs?)$/i.test(afterToolMatch[1])
+    ) {
+      rawCountToken = afterToolMatch[1].trim()
+    }
+
+    let recordCount: number | string
+    if (rawCountToken !== null) {
+      if (/^-?\d+$/.test(rawCountToken)) {
+        // Whole number -> real integer
+        recordCount = parseInt(rawCountToken, 10)
+      } else {
+        // If not a whole number, keep original text so server R3 check flags it
+        recordCount = rawCountToken
       }
-    }
-
-    if (recordCount === null) {
-      unparseable.push(
-        `"${clause}": could not extract valid record count (positive integer required)`
-      )
+    } else {
+      unparseable.push(`"${clause}": could not extract record count`)
       continue
-    }
-
-    if (recordCount > 1000) {
-      warnings.push(
-        `Row count ${recordCount} in "${clause}" was clamped to maximum allowed 1000 records.`
-      )
-      recordCount = 1000
     }
 
     // 3. Environment extraction: TEST or STAGE (defaults to TEST if omitted)
@@ -101,7 +114,7 @@ export function parseJobsFromText(
       continue
     }
 
-    // 4. Record ID extraction: e.g. "as J10", "id J10", "named J10"
+    // 4. Record ID extraction: e.g. "as J10", "id J10", "named J10" (keep original case, trimmed)
     let recordId: string | null = null
     const idMatch = clause.match(
       /\b(?:as|id|named|record_id)\s+([A-Za-z0-9_-]{1,20})\b/i
@@ -133,6 +146,14 @@ export function parseJobsFromText(
       record_count: recordCount,
       environment,
     })
+  }
+
+  // Enforce 10-row limit with clear message
+  if (records.length > 10) {
+    warnings.push(
+      `Plain-English builder generated ${records.length} jobs. Maximum batch limit is 10 rows; only the first 10 rows were kept.`
+    )
+    records.splice(10)
   }
 
   return { records, unparseable, warnings }

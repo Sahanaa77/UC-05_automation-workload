@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { getSubscription, getTools, setApiToken, getApiToken, ToolsApiResponse } from '../lib/api'
+import { UC05Subscription } from '../types'
 
 export interface DevTokenOption {
   token: string
@@ -49,15 +51,58 @@ interface AuthContextType {
   setToken: (token: string) => void
   activeTokenOption: DevTokenOption
   tokens: DevTokenOption[]
+  subscription: UC05Subscription | null
+  toolsData: ToolsApiResponse | null
+  isAuthLoading: boolean
+  refetchAuth: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [token, setToken] = useState<string>('dev-token-a-operator')
+  const [token, setTokenState] = useState<string>(() => getApiToken())
+  const [subscription, setSubscription] = useState<UC05Subscription | null>(null)
+  const [toolsData, setToolsData] = useState<ToolsApiResponse | null>(null)
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true)
 
   const activeTokenOption =
     DEV_TOKENS.find((t) => t.token === token) || DEV_TOKENS[0]
+
+  const fetchAuthData = useCallback(async (authToken: string) => {
+    setIsAuthLoading(true)
+    setSubscription(null)
+    setToolsData(null)
+    try {
+      const [sub, tools] = await Promise.all([
+        getSubscription(authToken),
+        getTools(authToken),
+      ])
+      setSubscription(sub)
+      setToolsData(tools)
+    } catch (err) {
+      console.error('Failed to fetch auth/subscription data for', authToken, err)
+    } finally {
+      setIsAuthLoading(false)
+    }
+  }, [])
+
+  const setToken = useCallback((newToken: string) => {
+    setTokenState(newToken)
+    setApiToken(newToken)
+    setSubscription(null)
+    setToolsData(null)
+    setIsAuthLoading(true)
+    window.dispatchEvent(new CustomEvent('workloadlens:identity-changed', { detail: newToken }))
+    fetchAuthData(newToken)
+  }, [fetchAuthData])
+
+  useEffect(() => {
+    fetchAuthData(token)
+  }, [fetchAuthData, token])
+
+  const refetchAuth = useCallback(async () => {
+    await fetchAuthData(token)
+  }, [fetchAuthData, token])
 
   return (
     <AuthContext.Provider
@@ -66,6 +111,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setToken,
         activeTokenOption,
         tokens: DEV_TOKENS,
+        subscription,
+        toolsData,
+        isAuthLoading,
+        refetchAuth,
       }}
     >
       {children}

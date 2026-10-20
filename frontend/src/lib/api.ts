@@ -4,7 +4,32 @@ import {
   UC05WorkloadRun,
 } from '../types'
 
+export const DEMO = import.meta.env.VITE_DEMO_MODE !== '0'
+
 const API_BASE = '/api'
+
+let currentToken = (() => {
+  try {
+    return localStorage.getItem('workloadlens-token') || 'dev-token-a-operator'
+  } catch {
+    return 'dev-token-a-operator'
+  }
+})()
+
+export function setApiToken(token: string) {
+  currentToken = token
+  try {
+    localStorage.setItem('workloadlens-token', token)
+  } catch {}
+}
+
+export function getApiToken(): string {
+  try {
+    const saved = localStorage.getItem('workloadlens-token')
+    if (saved) return saved
+  } catch {}
+  return currentToken
+}
 
 export class ApiError extends Error {
   status: number
@@ -48,15 +73,30 @@ export function formatApiErrorMessage(status: number, data: any): string {
   }
 }
 
-export async function checkHealth(): Promise<{ status: string }> {
-  const res = await fetch(`${API_BASE}/health`)
-  if (!res.ok) throw new ApiError(`Health check failed: ${res.statusText}`, res.status)
-  return res.json()
+export async function checkHealth(): Promise<{ status: string; ok: boolean; httpStatus: number }> {
+  try {
+    // Use the exact same base path as the other calls
+    const res = await fetch(`${API_BASE}/health`)
+    const isOk = res.status === 200
+    const data = await res.json().catch(() => ({}))
+    return { status: isOk ? (data.status || 'ok') : 'error', ok: isOk, httpStatus: res.status }
+  } catch {
+    // Fallback to /health in case static is mounted without /api
+    try {
+      const fallback = await fetch('/health')
+      const isOk = fallback.status === 200
+      const data = await fallback.json().catch(() => ({}))
+      return { status: isOk ? (data.status || 'ok') : 'error', ok: isOk, httpStatus: fallback.status }
+    } catch {
+      return { status: 'offline', ok: false, httpStatus: 0 }
+    }
+  }
 }
 
-export async function getSubscription(token: string): Promise<UC05Subscription> {
+export async function getSubscription(token?: string): Promise<UC05Subscription> {
+  const activeToken = token || getApiToken()
   const res = await fetch(`${API_BASE}/subscription`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${activeToken}` },
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -75,9 +115,10 @@ export interface ToolsApiResponse {
   rate_ms_per_record: number
 }
 
-export async function getTools(token: string): Promise<ToolsApiResponse> {
+export async function getTools(token?: string): Promise<ToolsApiResponse> {
+  const activeToken = token || getApiToken()
   const res = await fetch(`${API_BASE}/tools`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${activeToken}` },
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -90,12 +131,13 @@ export async function createWorkloadRun(
   operation: 'validate' | 'process',
   records: UC05JobRecord[],
   idempotencyKey: string,
-  token: string,
+  token?: string,
   forceFailure: boolean = false
 ): Promise<UC05WorkloadRun> {
+  const activeToken = token || getApiToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
+    Authorization: `Bearer ${activeToken}`,
     'Idempotency-Key': idempotencyKey,
   }
   if (forceFailure) {
@@ -117,9 +159,10 @@ export async function createWorkloadRun(
   return data
 }
 
-export async function getWorkloadRuns(token: string): Promise<UC05WorkloadRun[]> {
+export async function getWorkloadRuns(token?: string): Promise<UC05WorkloadRun[]> {
+  const activeToken = token || getApiToken()
   const res = await fetch(`${API_BASE}/runs`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${activeToken}` },
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -130,10 +173,11 @@ export async function getWorkloadRuns(token: string): Promise<UC05WorkloadRun[]>
 
 export async function getWorkloadRunResult(
   runId: string,
-  token: string
+  token?: string
 ): Promise<UC05WorkloadRun> {
+  const activeToken = token || getApiToken()
   const res = await fetch(`${API_BASE}/runs/${runId}/result`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${activeToken}` },
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
