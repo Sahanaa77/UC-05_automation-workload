@@ -31,3 +31,11 @@ backend/*.egg-info/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Terraform — never commit state or provider cache.
+# Local state files contain sensitive values (e.g. DATABASE_URL) in plaintext.
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/.terraform/
+infra/tfplan-*
+infra/.terraform.lock.hcl

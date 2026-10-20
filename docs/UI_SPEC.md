@@ -2,7 +2,7 @@
 Look: clean developer tool, light theme, blue palette (primary #1D4ED8, soft blue panels #EFF6FF, red #EF4444 violations, green #22C55E pass), rounded cards, Inter font. shadcn/ui components, Lucide icons, Recharts for charts.
 
 ## Shell
-Top bar: "EntitleSim" logo + tagline "Model-based verification for SaaS entitlements". Horizontal 6-step stepper (Model & Define · Bounded Exploration · Violation & Minimization · Inspect State Diff · Fix & Retest · Regression Export) — current step highlighted, clickable. Header right: Run History drawer (past runs + saved models from Postgres; click to reopen). Footer link: "Boundaries" dialog (3 constraints from PRD).
+Top bar: "WorkloadLens" logo + tagline "Model-based verification for SaaS entitlements". Horizontal 6-step stepper (Model & Define · Bounded Exploration · Violation & Minimization · Inspect State Diff · Fix & Retest · Regression Export) — current step highlighted, clickable. Header right: Run History drawer (past runs + saved models from Postgres; click to reopen). Footer link: "Boundaries" dialog (3 constraints from PRD).
 
 ## Screens (React Router, single app state via context)
 1. **Model & Define** — left: JSON/YAML editor (textarea with mono font) preloaded with sample; right: parsed summary cards (tenants, plans, transitions, invariants). Buttons: Validate, Save, Load sample. Errors inline.

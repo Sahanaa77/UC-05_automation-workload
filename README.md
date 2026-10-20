@@ -1,8 +1,8 @@
-# EntitleSim
+# WorkloadLens
 
 > Model-Based Verification & Counterexample Engine for SaaS Entitlement Workflows
 
-EntitleSim systematically explores bounded event sequences (reordered/duplicated webhooks, concurrent ops, interrupted handlers), checks developer-defined entitlement and tenant-isolation invariants, minimizes failing traces into counterexamples, lets the dev validate a fix, and exports a regression test for CI/CD.
+WorkloadLens systematically explores bounded event sequences (reordered/duplicated webhooks, concurrent ops, interrupted handlers), checks developer-defined entitlement and tenant-isolation invariants, minimizes failing traces into counterexamples, lets the dev validate a fix, and exports a regression test for CI/CD.
 
 ## Differentiators
 
@@ -34,7 +34,7 @@ This starts:
 
 ### Running the 1-Click Demo
 
-Once `task dev` is running, open [http://localhost:5173](http://localhost:5173) in your browser and click **Run Demo** in the top navigation bar. EntitleSim will automatically walk through steps 1 to 6 end-to-end:
+Once `task dev` is running, open [http://localhost:5173](http://localhost:5173) in your browser and click **Run Demo** in the top navigation bar. WorkloadLens will automatically walk through steps 1 to 6 end-to-end:
 1. Loads the SaaS subscription model (2 tenants, 5 invariants).
 2. Explores bounded state space and captures the `INV-1` unauthorized premium access violation.
 3. Minimizes the failing trace to the canonical 4-step sequence.
@@ -78,3 +78,35 @@ cd frontend && npm run build
 - **Sandbox only**: No real payment-provider or Stripe transactions; all events simulated locally.
 
 > *"From a flaky production bug to a permanent regression test in one workflow."*
+
+---
+
+## Azure Deployment
+
+Infrastructure for Azure is in `infra/`. See [`docs/deployment-runbook.md`](docs/deployment-runbook.md) for the full guide.
+
+**Quick path:**
+
+```bash
+# 1. Fill in all FILL_IN_* values in the parameter file for your environment.
+#    Never add database_url to this file.
+nano infra/environments/dev.tfvars
+
+# 2. Export the database connection string as an environment variable only.
+export TF_VAR_database_url="postgresql://user:pass@host:5432/entitlesim"
+
+# 3. Deploy (runs preflight checks, plan, apply, and smoke test).
+ENV=dev ./scripts/deploy.sh
+
+# 4. Verify independently at any time.
+FQDN=$(terraform -chdir=infra output -raw container_app_fqdn)
+./scripts/verify.sh "${FQDN}"
+```
+
+**Terraform scope** — this module creates exactly two resources:
+- Azure Container App (WorkloadLens API, port 8000, `GET /health`)
+- Private Blob container inside a pre-existing Storage Account
+
+The Resource Group, Container Apps Environment, and Storage Account are pre-existing shared dependencies; they are referenced, not created or deleted.
+
+For cleanup instructions, see [`docs/deployment-runbook.md §8`](docs/deployment-runbook.md#8-cleanup-guarded).
