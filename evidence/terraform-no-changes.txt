@@ -1,0 +1,12 @@
+﻿data.azurerm_resource_group.main: Reading...
+data.azurerm_resource_group.main: Read complete after 4s [id=/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo]
+data.azurerm_storage_account.data: Reading...
+azurerm_container_app.api: Refreshing state... [id=/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.App/containerApps/workloadlens-api-dev]
+data.azurerm_storage_account.data: Still reading... [00m10s elapsed]
+data.azurerm_storage_account.data: Read complete after 12s [id=/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.Storage/storageAccounts/uc05storef6ea8975]
+azurerm_storage_container.data: Refreshing state... [id=https://uc05storef6ea8975.blob.core.windows.net/workloadlens-data]
+
+No changes. Your infrastructure matches the configuration.
+
+Terraform has compared your real infrastructure against your configuration
+and found no differences, so no changes are needed.

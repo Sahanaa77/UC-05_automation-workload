@@ -116,3 +116,13 @@ FQDN=$(terraform -chdir=infra output -raw container_app_fqdn)
 The Resource Group, Container Apps Environment, and Storage Account are pre-existing shared dependencies; they are referenced, not created or deleted.
 
 For cleanup instructions, see [`docs/deployment-runbook.md §8`](docs/deployment-runbook.md#8-cleanup-guarded).
+
+### Deployment & CI Evidence
+
+Verified live deployment and CI artifacts are cataloged in [`evidence/README.md`](evidence/README.md):
+- **Health Response**: [`evidence/health-response.json`](evidence/health-response.json) (HTTP 200 OK)
+- **Live Headers**: [`evidence/verify-curl.txt`](evidence/verify-curl.txt) (Uvicorn server response)
+- **Pre-Deploy Plan**: [`evidence/terraform-plan.txt`](evidence/terraform-plan.txt) (2 to add)
+- **Apply Output**: [`evidence/terraform-apply.txt`](evidence/terraform-apply.txt) (2 added)
+- **Idempotency Plan**: [`evidence/terraform-no-changes.txt`](evidence/terraform-no-changes.txt) (0 drift)
+- **CI Pipeline**: [`evidence/ci-results.md`](evidence/ci-results.md) (All 4 GitHub Actions jobs succeeded)

@@ -1,7 +1,7 @@
-data.azurerm_resource_group.main: Reading...
-data.azurerm_resource_group.main: Read complete after 1s [id=/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo]
+﻿data.azurerm_resource_group.main: Reading...
+data.azurerm_resource_group.main: Read complete after 1s [id=/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo]
 data.azurerm_storage_account.data: Reading...
-data.azurerm_storage_account.data: Read complete after 1s [id=/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.Storage/storageAccounts/uc05storef6ea8975]
+data.azurerm_storage_account.data: Read complete after 1s [id=/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.Storage/storageAccounts/uc05storef6ea8975]
 
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
@@ -11,7 +11,7 @@ Terraform will perform the following actions:
 
   # azurerm_container_app.api will be created
   + resource "azurerm_container_app" "api" {
-      + container_app_environment_id  = "/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.App/managedEnvironments/uc05-env"
+      + container_app_environment_id  = "/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.App/managedEnvironments/uc05-env"
       + custom_domain_verification_id = (sensitive value)
       + id                            = (known after apply)
       + latest_revision_fqdn          = (known after apply)
@@ -105,7 +105,7 @@ azurerm_storage_container.data: Creation complete after 2s [id=https://uc05store
 azurerm_container_app.api: Still creating... [00m10s elapsed]
 azurerm_container_app.api: Still creating... [00m20s elapsed]
 azurerm_container_app.api: Still creating... [00m30s elapsed]
-azurerm_container_app.api: Creation complete after 38s [id=/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.App/containerApps/workloadlens-api-dev]
+azurerm_container_app.api: Creation complete after 38s [id=/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.App/containerApps/workloadlens-api-dev]
 
 Apply complete! Resources: 2 added, 0 changed, 0 destroyed.
 
@@ -113,8 +113,8 @@ Outputs:
 
 blob_container_name = "workloadlens-data"
 container_app_fqdn = "workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io"
-container_app_id = "/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.App/containerApps/workloadlens-api-dev"
+container_app_id = "/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.App/containerApps/workloadlens-api-dev"
 container_app_name = "workloadlens-api-dev"
 resource_group_name = "rg-uc05-demo"
-storage_account_id = "/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.Storage/storageAccounts/uc05storef6ea8975"
+storage_account_id = "/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.Storage/storageAccounts/uc05storef6ea8975"
 storage_account_name = "uc05storef6ea8975"

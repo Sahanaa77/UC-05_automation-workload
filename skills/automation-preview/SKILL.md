@@ -101,16 +101,24 @@ Expected output:
 
 ## Step 4 — Save evidence
 
-After a successful deploy, save the outputs to `evidence/`:
+After a successful deploy, capture and verify the outputs in `evidence/`:
 
 ```bash
-terraform -chdir=infra plan  -var-file=environments/dev.tfvars 2>&1 | tee evidence/terraform-plan.txt
-terraform -chdir=infra apply ...                                 2>&1 | tee evidence/terraform-apply.txt
-./scripts/verify.sh "${FQDN}"                                   2>&1 | tee evidence/verify-curl.txt
-curl -s "https://${FQDN}/health"                                      | tee evidence/health-response.json
+# 1. Pre-deployment plan (showing 2 resources to add)
+terraform -chdir=infra plan -var-file=environments/dev.tfvars 2>&1 | tee evidence/terraform-plan.txt
+
+# 2. Deployment apply output (showing 2 resources added)
+terraform -chdir=infra apply ... 2>&1 | tee evidence/terraform-apply.txt
+
+# 3. Post-deployment smoke test (HTTP status and headers)
+curl -i "https://${FQDN}/health" > evidence/verify-curl.txt
+curl -s "https://${FQDN}/health" > evidence/health-response.json
+
+# 4. Fresh second plan (confirming 0 drift / no changes)
+terraform -chdir=infra plan -var-file=environments/dev.tfvars -detailed-exitcode 2>&1 | tee evidence/terraform-no-changes.txt
 ```
 
-See `evidence/README.md` for the full artifact checklist.
+See [`evidence/README.md`](../../evidence/README.md) for the full artifact index and CI results.
 
 ---
 
