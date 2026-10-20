@@ -1,199 +1,321 @@
-# EntitleSim
+# WorkloadLens — Automation Workload Preview SaaS
 
-> Model-Based Verification & Counterexample Engine for SaaS Entitlement Workflows
+**UC-05 | Cloud and SaaS Engineering Challenge | Team Code Sapiens**
 
-EntitleSim is a developer workbench that systematically explores bounded event sequences (reordered webhooks, duplicated events, concurrent operations, and interrupted handlers), checks developer-defined entitlement and tenant-isolation invariants, minimizes failing traces into counterexamples using delta debugging, validates fixes, and exports reproducible regression tests for CI/CD.
+WorkloadLens is a multi-tenant SaaS application that validates proposed automation jobs and provides a workload preview for eligible Pro subscribers. It checks job inputs, estimates processing effort, records run results, and enforces subscription plans, user permissions, daily quotas, and tenant isolation.
 
----
+The workload estimate uses the challenge's fixed teaching rule of **10 milliseconds per record**. It is an illustrative estimate, not a real-world performance guarantee.
 
-## Architecture Diagram
+## Overview
 
-The diagram below illustrates EntitleSim's logical verification pipeline, from model definition and in-memory exploration to counterexample minimization and deployment infrastructure.
+WorkloadLens provides two operations:
 
-```mermaid
-flowchart TD
-    %% ------------------------------------------------------------------------
-    %% EntitleSim: Monochrome Architecture Diagram
-    %% ------------------------------------------------------------------------
+- **Validate:** Check automation job requests against four validation rules and report valid rows, invalid rows, and validation issues.
+- **Process:** Generate a workload preview for valid requests, including per-job estimated effort and an aggregate summary. This operation is available to Pro subscribers.
 
-    subgraph INPUT ["1. Verification Input"]
-        M_DEF["SaaS Model Definition: Tenants, Plans, Roles, Invariants"]
-        M_BOUNDS["Exploration Bounds: Depth, Retries, Concurrency, Seed"]
-        M_EVENTS["Initial Event Sequences: Subscription, Usage, Invoices"]
-    end
+The application is designed around the shared UC-05 SaaS contract, with two standard screens: **Run Tools** and **History**.
 
-    subgraph ENGINE ["2. Core Verification Engine (In-Memory)"]
-        EXPLORER["Bounded Event Explorer: Permutations, Duplicates, Reordering"]
-        ORACLE["Reference Oracle: Expected State Computation"]
-        SUT["System Under Test: Handlers and Bug Flags"]
-        INV_CHECK["Invariant Checker: Entitlements, Quotas, Tenant Isolation"]
-    end
+## Key Features
 
-    subgraph DEBUGGING ["3. Results & Minimization"]
-        VIOLATIONS["Invariant Violations Detected: Failing Event Traces"]
-        MINIMIZER["Trace Minimizer: ddmin Delta Debugging Algorithm"]
-        DIFF["State Diff Inspector: Expected vs Observed Transitions"]
-        RETEST["Fix Validation: Re-Verification with fixed=True"]
-        EXPORT["Regression Exporter: Generated pytest Files & CI Suite"]
-    end
+- **Four validation rules:** Validate record IDs, supported tools, record counts, and execution environments.
+- **Workload estimation:** Calculate estimated processing time and total record counts.
+- **Multi-tenant access control:** Isolate data by verified tenant identity.
+- **Subscription enforcement:** Support Basic and Pro plans, Operator and Viewer roles, and suspended subscriptions.
+- **Daily usage limits:** Enforce tenant-wide quotas using UTC calendar days.
+- **Idempotent requests:** Prevent duplicate execution and quota consumption when an accepted request is replayed with the same key and input.
+- **Run history:** Retrieve past runs and their recorded results.
+- **Failure handling:** Persist accepted runs that fail during processing without refunding their quota.
+- **Cloud deployment:** Terraform-based infrastructure and deployment, verification, and cleanup scripts.
+- **Automation skill:** A `SKILL.md` guide for repeatable deployment and verification workflows.
 
-    subgraph APP ["4. Application & Persistence Layer"]
-        UI["Frontend Dashboard: React 19, Stepper, State Machine Graph"]
-        API["Backend REST API: FastAPI, Models, Runs, Counterexamples"]
-        DB[("Database Storage: SQLite default or PostgreSQL JSONB")]
-    end
+## How It Works
 
-    subgraph INFRA ["5. Build & Hosting Infrastructure"]
-        GHA["GitHub Actions CI: Tests, Frontend Build, Container Image Build"]
-        ACR["Azure Container Registry: uc05registry7bef65da.azurecr.io"]
-        ACA["Azure Container App: workloadlens-api-dev on Port 8000"]
-        BLOB["Azure Blob Storage: workloadlens-data (Private Container)"]
-    end
+1. An authenticated user opens Run Tools.
+2. The backend identifies the user's tenant, role, subscription, and plan.
+3. The user submits a batch for validation or processing.
+4. WorkloadLens checks the request structure and applies the four row-validation rules.
+5. The backend checks request idempotency and atomically reserves quota for a newly accepted run.
+6. The run is persisted, processed, and marked `Succeeded` or `Failed`.
+7. The result is available through the API and History screen.
 
-    %% Verification Engine Flow
-    INPUT --> EXPLORER
-    EXPLORER --> ORACLE
-    EXPLORER --> SUT
-    ORACLE --> INV_CHECK
-    SUT --> INV_CHECK
+## Validation Rules
 
-    %% Debugging and Minimization Flow
-    INV_CHECK -->|Violations Found| VIOLATIONS
-    VIOLATIONS --> MINIMIZER
-    MINIMIZER --> DIFF
-    DIFF --> RETEST
-    RETEST --> EXPORT
+| Rule | Field | Requirement |
+|---|---|---|
+| R1 | `record_id` | Nonempty string, maximum 20 characters, unique within the batch |
+| R2 | `tool` | Must be `EXPORT` or `VALIDATE` |
+| R3 | `record_count` | Integer from 1 through 1000; booleans and numeric strings are invalid |
+| R4 | `environment` | Must be `TEST` or `STAGE` |
 
-    %% Application Layer Connections
-    UI <-->|HTTP REST / Progress Polling| API
-    API <-->|Durable Persistence| DB
-    API <-->|In-Memory Execution| ENGINE
-    API -.->|Fetch Counterexamples & Traces| DEBUGGING
+Strings are trimmed before validation. Record IDs remain case-sensitive, and only subsequent occurrences of a duplicate ID are marked as duplicates. Each invalid row is counted once, even if it violates multiple rules.
 
-    %% Build and Cloud Infrastructure Connections
-    API -.->|Packaged via Dockerfile| GHA
-    GHA -->|Build & Push Docker Image| ACR
-    ACR -->|Container Image Pull on Deploy| ACA
-    ACA -.->|Infrastructure Pre-requisite| BLOB
+## Example Workload Preview
 
-    %% Styling: Black outlines, white fill, black text
-    classDef default fill:#ffffff,stroke:#000000,stroke-width:1.5px,color:#000000;
-    classDef storage fill:#fcfcfc,stroke:#000000,stroke-width:1.5px,stroke-dasharray: 4 2,color:#000000;
-    class DB,BLOB storage;
+Input:
+
+| Record ID | Tool | Record Count | Environment |
+|---|---|---:|---|
+| J01 | EXPORT | 20 | TEST |
+| J02 | VALIDATE | 10 | STAGE |
+
+Expected processing result:
+
+| Record ID | Estimated Time |
+|---|---:|
+| J01 | 200 ms |
+| J02 | 100 ms |
+
+Summary:
+
+- Input rows: `2`
+- Total records: `30`
+- Total estimated time: `300 ms`
+
+The valid fixture should produce two valid rows and zero invalid rows. The invalid fixture adds four rows containing one R1–R4 failure each, producing two valid rows and four invalid rows.
+
+## SaaS Plans and Permissions
+
+| Capability | Basic | Pro |
+|---|---|---|
+| Validate jobs | Allowed | Allowed |
+| Process jobs | Not allowed | Allowed |
+| Accepted runs per tenant per UTC day | 3 | 10 |
+
+**Roles**
+
+- **Operator:** Can submit eligible runs and read the tenant's run history and results.
+- **Viewer:** Read-only access to the tenant's permitted information.
+
+The daily allowance is shared by all users within a tenant. Suspended subscriptions cannot start new runs, but authorised users can still access historical data.
+
+Each accepted unique run consumes one quota slot, including runs that subsequently fail. Rejected requests do not consume quota.
+
+## Technology and Architecture
+
+- **Frontend:** React, TypeScript, Vite
+- **Backend:** Python and FastAPI
+- **Persistence:** SQL database
+- **Object storage:** Private Azure Blob container
+- **Cloud platform:** Azure Container Apps
+- **Infrastructure as Code:** Terraform
+- **Automation:** Shell scripts and `skills/automation-preview/SKILL.md`
+- **CI/CD:** GitHub Actions workflow for backend image build and push
+
+### Logical Architecture
+
+```text
+Operator / Viewer
+       |
+       v
+React Web Application
+       |
+       v
+FastAPI Backend
+       |
+       +--> Authentication and tenant authorization
+       |
+       +--> Request validation and idempotency
+       |
+       +--> Subscription and quota enforcement
+       |
+       +--> Workload processing helper
+       |
+       +--> SQL Database
+       |      Runs
+       |      DailyUsage
+       |      Subscription data
+       |
+       +--> Private Blob Storage
+              Result storage
 ```
 
-> **Note on Infrastructure Separation:**
-> - **Verification Data Flow:** All verification states, runs, counterexamples, and regression exports are evaluated in-memory and persisted durably in the application database (SQLite default or PostgreSQL with JSONB).
-> - **Azure Blob Storage (`workloadlens-data`):** Managed as an isolated cloud infrastructure dependency via Terraform; application verification results are stored in the database, not in Blob Storage.
-> - **CI/CD Automation:** GitHub Actions runs backend tests, frontend builds, Terraform validation, and builds/pushes container images to Azure Container Registry (ACR). It does not automatically deploy; cloud deployments are operator-controlled via Terraform.
+The verified identity determines the tenant. Tenant identity must not be trusted from request bodies or editable browser fields.
 
----
+## API Reference
 
-## Verification Pipeline
+WorkloadLens exposes the six required API routes.
 
-EntitleSim executes a five-stage verification lifecycle:
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/health` | Public health check |
+| GET | `/tools` | List available tools and operations |
+| GET | `/subscription` | Retrieve the current tenant's subscription and plan |
+| POST | `/runs` | Validate or process a batch |
+| GET | `/runs` | List the current tenant's runs |
+| GET | `/runs/{id}/result` | Retrieve an authorised run's result or recorded failure |
 
-1. **Model & Bounds Ingestion**: Developers supply a declarative model containing tenant IDs, subscription tiers (`free`, `pro`), feature flags, role permissions, and formal invariants (`INV-1` feature access, `INV-2` usage quotas, `INV-3` cross-tenant isolation). Exploration bounds define maximum search depth, retry thresholds, concurrency interleavings, and random seed.
-2. **Systematic State Exploration**: The in-memory Bounded Event Explorer systematically permutes event arrival orderings and injects duplicate webhooks. Each sequence is dispatched in parallel to both the Reference Oracle (calculating true expected state) and the System Under Test (SUT) with configurable bug toggles.
-3. **Invariant Checking**: Invariants are evaluated across all tenants after each state transition. Any mismatch between expected and observed state triggers an invariant violation report with its complete trace.
-4. **Counterexample Minimization (`ddmin`)**: Raw counterexample traces often contain non-essential noise events. The trace minimizer applies the Delta Debugging (`ddmin`) algorithm to discard irrelevant steps while preserving the failure, isolating canonical failure sequences (e.g., 4 steps for out-of-order plan upgrade/downgrade races).
-5. **Fix Validation & Regression Export**: Developers validate fixes (`fixed=true`) through a re-verification pass ensuring zero invariant violations. EntitleSim exports standalone `pytest` test files and CI workflow definitions to prevent regressions.
+### Submit a Run
 
----
+`POST /runs` requires an `Idempotency-Key` header and a JSON body containing `operation` and `records`.
 
-## Quickstart
+Supported operations are `validate` and `process`. A request must contain 1–10 records and remain within the 64 KiB request limit.
 
-### Local Development (without Docker)
+Important response behaviour:
 
-EntitleSim defaults to an embedded SQLite file database at `backend/entitlesim.db`:
+- `201`: New accepted run, processed to a terminal status.
+- `200`: Matching idempotent replay of a terminal run.
+- `400`: Invalid request shape or invalid batch for processing.
+- `401`: Missing authentication.
+- `403`: Insufficient role, plan entitlement, or active subscription.
+- `404`: Unknown run or run belonging to another tenant.
+- `409`: Idempotency conflict or a matching run that is still running.
+- `429`: Daily quota exhausted.
 
-```bash
-task dev
+Validation issues identify the row using a 1-based `row_index`, together with the `field` and `rule_id`.
+
+## Project Structure
+
+```text
+.
+├── backend/                     FastAPI application and backend tests
+├── frontend/                    React and TypeScript application
+├── infra/                       Terraform configuration
+│   └── environments/            Environment parameter files
+├── scripts/                     Deployment, verification and cleanup
+├── skills/
+│   └── automation-preview/
+│       └── SKILL.md              Automation workflow instructions
+├── tests/                       Application and acceptance tests
+├── evidence/                    Redacted verification evidence
+├── .github/
+│   └── workflows/               GitHub Actions workflows
+├── README.md
+└── RUNBOOK.md                   Deployment and operations guide, if present
 ```
 
-This starts:
-- **Web Dashboard**: [http://localhost:5173](http://localhost:5173)
-- **API & Interactive Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
+The actual repository may contain additional files. The directory descriptions above indicate the intended responsibilities of each area.
 
-### Running the 1-Click Interactive Demo
+## Local Development
 
-Once `task dev` is running, open [http://localhost:5173](http://localhost:5173) in your browser and click **Run Demo** in the top navigation bar. EntitleSim will execute the 6-step workflow automatically:
-1. **Model & Define**: Loads the sample SaaS model (2 tenants, feature tiers, 5 invariants).
-2. **Bounded Exploration**: Permutes event orderings, captures states explored, and flags `INV-1` unauthorized access.
-3. **Violation & Minimization**: Minimizes the trace to the canonical 4-step counterexample using `ddmin`.
-4. **Inspect State Diff**: Highlights the offending transition on the state machine graph with side-by-side diffs.
-5. **Fix & Retest**: Enables the fix (`fixed=true`) and runs a re-verification pass (0 violations).
-6. **Regression Export**: Displays the generated self-contained `pytest` regression suite and CI configuration.
+### Prerequisites
 
-### Optional: Docker Compose (PostgreSQL)
+Install Python, Node.js with npm, Git, and the dependencies required by the project. Azure CLI and Terraform are needed for cloud deployment, not ordinary frontend development.
 
-If Docker is available, EntitleSim can run with PostgreSQL:
+### 1. Clone the repository
 
-```bash
-task up
-# or
-docker compose up --build
+```powershell
+git clone https://github.com/Sahanaa77/uc05-Code-Sapiens.git
+cd uc05-Code-Sapiens
 ```
 
----
+### 2. Start the backend
 
-## Verification & Testing
+In PowerShell:
 
-```bash
-# Run backend engine and API test suite (21 passed)
-task test
-
-# Seed the default SaaS models into the database
-task seed
-
-# Build frontend production bundle
-cd frontend && npm run build
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 ```
 
----
+Set the required local environment variables according to the backend configuration and `.env.example` files. Do not commit secrets.
 
-## Boundaries & Limitations
+If the backend entry point is `backend/app/main.py`, start it with:
 
-- **Model-Based Verification**: EntitleSim verifies the developer-defined state model or instrumented adapter, not arbitrary uninstrumented source code.
-- **Bounded Exploration**: State exploration is finite and strictly bounded by user-configured depth, retry, and concurrency limits to guarantee termination.
-- **Sandbox Environment**: All webhook and billing events are simulated locally; no live Stripe or external payment gateway transactions are performed.
+```powershell
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
 
----
+If the supplied starter uses a different entry point, use the module path defined by the actual application. Keep the backend running in this terminal.
 
-## Cloud Deployment & Live Verification
+### 3. Start the frontend
 
-Infrastructure as Code is managed under [`infra/`](infra/). For complete instructions, see the [`Deployment Runbook`](docs/deployment-runbook.md).
+Open a second terminal:
 
-**Live Deployed Verification:**
-- **Container App Endpoint:** `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/health`
-- **Region:** `centralindia` (Resource Group: `rg-uc05-demo`, Environment: `uc05-env`)
-- **Status:** Healthy (`HTTP 200 OK`, `{"status":"ok","version":"0.1.0"}`)
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-### Quick Deployment Path
+Open the local URL printed by Vite, usually `http://localhost:5173`.
+
+Configure the frontend API base URL using the variable documented in `frontend/.env.example`. Ensure it points to the local backend.
+
+### 4. Build the frontend
+
+From the `frontend` directory:
+
+```powershell
+npm run build
+```
+
+A successful build should finish without TypeScript or bundling errors.
+
+### 5. Run tests
+
+From the repository root, inspect the test configuration and use the project's configured test commands. For a Python project using pytest, the usual command is:
+
+```powershell
+python -m pytest -q
+```
+
+Run the frontend build and relevant backend and acceptance tests before submitting changes. Record actual results rather than assuming that tests passed.
+
+## Azure Deployment
+
+The repository includes Terraform infrastructure and helper scripts intended for the assigned UC-05 environment.
+
+The challenge specifies two Terraform-managed resources:
+
+1. One Azure Container App.
+2. One private Blob container inside a pre-existing Storage Account.
+
+The Resource Group, Container Apps Environment, Storage Account, database, registry, managed identity, and permissions are supplied or configured through the authorised hackathon environment as applicable. Do not create or modify shared resources without permission.
+
+Before deployment:
+
+1. Confirm access to the assigned Azure sandbox and subscription.
+2. Obtain the correct environment parameters and required secrets.
+3. Build and publish the backend image to the authorised registry.
+4. Review the Terraform plan and confirm that only the intended resources are targeted.
+5. Deploy using the repository's scripts and verify `/health`.
+6. Run the acceptance checks and retain redacted evidence.
+
+Typical script entry points are:
 
 ```bash
-# 1. Populate dev parameter file (do not commit secrets)
-nano infra/environments/dev.tfvars
-
-# 2. Export runtime secrets via environment variables
-export TF_VAR_database_url="postgresql://user:pass@host:5432/entitlesim"  # or use SQLite default
-export TF_VAR_acr_password=$(az acr credential show --name <acr> --query "passwords[0].value" -o tsv)
-
-# 3. Deploy via helper script (runs preflight, plan, apply, and smoke test)
 ENV=dev ./scripts/deploy.sh
-
-# 4. Verify independently
-FQDN=$(terraform -chdir=infra output -raw container_app_fqdn)
-./scripts/verify.sh "${FQDN}"
+./scripts/verify.sh <application-url>
+ENV=dev ./scripts/cleanup.sh
 ```
 
-### Deployment & CI Evidence
+Check the scripts and `RUNBOOK.md` for their exact arguments, required environment variables, and cleanup confirmation procedure before running them. Never place credentials in Git or expose them in terminal logs.
 
-Verified deployment and CI artifacts are cataloged in [`evidence/README.md`](evidence/README.md):
-- **Health Response**: [`evidence/health-response.json`](evidence/health-response.json) (HTTP 200 OK)
-- **Live Headers**: [`evidence/verify-curl.txt`](evidence/verify-curl.txt) (Uvicorn server response)
-- **Pre-Deploy Plan**: [`evidence/terraform-plan.txt`](evidence/terraform-plan.txt) (2 to add)
-- **Apply Output**: [`evidence/terraform-apply.txt`](evidence/terraform-apply.txt) (2 added)
-- **Idempotency Plan**: [`evidence/terraform-no-changes.txt`](evidence/terraform-no-changes.txt) (0 drift)
-- **CI Pipeline**: [`evidence/ci-results.md`](evidence/ci-results.md) (All 4 GitHub Actions jobs succeeded)
+## Acceptance and Verification
+
+The UC-05 acceptance scope includes:
+
+- Terraform validation, deployment, healthy `/health`, and a no-change second plan.
+- Valid and invalid fixture results matching R1–R4.
+- Exact workload-preview rows and summary.
+- Result persistence and retrieval after an application restart.
+- Rejection of invalid processing requests, malformed bodies, and batches exceeding ten rows without quota debit.
+- Role, plan, subscription, and tenant-isolation enforcement.
+- Daily quota limits and atomic reservation under concurrent requests.
+- Idempotent replay and conflict handling.
+- Recorded processing failures and correct quota consumption.
+- A fresh assistant session reproducing the workflow using `SKILL.md`.
+
+Store evidence under `evidence/` only after the corresponding checks have actually been executed. Redact credentials, connection strings, access tokens, and other sensitive values.
+
+## Scope and Limitations
+
+- The workload estimate is a fixed educational calculation, not a production latency guarantee.
+- The application previews automation jobs; it does not execute external ERP writes or real-world automation.
+- Tenant isolation and execution permissions are core security requirements.
+- The challenge does not require payment checkout, signup, queues, schedulers, approval workflows, or additional administration screens.
+- The product's scored scope is the two operations, four validation rules, six API routes, two standard screens, subscription controls, and required automation and infrastructure deliverables.
+
+## Team and Repository
+
+**Team:** Code Sapiens  
+**Challenge:** Cloud and SaaS Engineering Challenges — Revision 2  
+**Use case:** UC-05 — Automation Workload Preview SaaS
+
+**Repository:** [Sahanaa77/uc05-Code-Sapiens](https://github.com/Sahanaa77/uc05-Code-Sapiens)
+
+---
+
+*WorkloadLens turns proposed automation jobs into validated, traceable workload previews while enforcing SaaS subscription and tenant boundaries.*
