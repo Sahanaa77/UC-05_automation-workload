@@ -127,7 +127,7 @@ export interface StepInfo {
 export interface UC05JobRecord {
   record_id: string
   tool: 'EXPORT' | 'VALIDATE' | string
-  record_count: number
+  record_count: number | string
   environment: 'TEST' | 'STAGE' | string
 }
 

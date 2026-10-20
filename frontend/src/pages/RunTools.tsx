@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   UC05JobRecord,
   UC05Subscription,
@@ -10,6 +10,7 @@ import {
   createWorkloadRun,
   ToolsApiResponse,
   ApiError,
+  DEMO,
 } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -45,9 +46,12 @@ import {
   Terminal,
   Check,
   Upload,
-  ArrowUpDown,
   PieChart as PieIcon,
   TrendingUp,
+  Wrench,
+  GripVertical,
+  Undo2,
+  Redo2,
 } from 'lucide-react'
 import { WorkloadAdvisor } from './WorkloadHistory'
 import {
@@ -90,25 +94,30 @@ export const ELEVEN_ROWS_FIXTURE: UC05JobRecord[] = Array.from({ length: 11 }, (
 }))
 
 // Circular quota gauge component
-const CircularQuotaGauge: React.FC<{ used: number; limit: number; remaining: number }> = ({
-  used,
-  limit,
-  remaining,
-}) => {
+const CircularQuotaGauge: React.FC<{
+  used: number
+  limit: number
+  remaining: number
+  animating?: boolean
+}> = ({ used, limit, remaining, animating = false }) => {
   const percentage = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0
   const radius = 28
   const circumference = 2 * Math.PI * radius
   const strokeDashoffset = circumference - (percentage / 100) * circumference
 
   return (
-    <div className="flex items-center gap-3">
+    <div
+      className={`flex items-center gap-3 transition-all duration-500 rounded-xl ${
+        animating ? 'scale-105 ring-2 ring-accent/50 bg-accent/10 px-2 py-1 shadow-sm' : ''
+      }`}
+    >
       <div className="relative w-16 h-16 flex items-center justify-center">
         <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 72 72">
           <circle
             cx="36"
             cy="36"
             r={radius}
-            className="text-slate-100 dark:text-slate-800"
+            className="text-border"
             strokeWidth="7"
             stroke="currentColor"
             fill="transparent"
@@ -117,7 +126,9 @@ const CircularQuotaGauge: React.FC<{ used: number; limit: number; remaining: num
             cx="36"
             cy="36"
             r={radius}
-            className={remaining === 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}
+            className={`transition-[stroke-dashoffset] duration-700 ease-out ${
+              remaining === 0 ? 'text-danger' : 'text-accent'
+            } ${animating ? 'animate-pulse' : ''}`}
             strokeWidth="7"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
@@ -126,15 +137,19 @@ const CircularQuotaGauge: React.FC<{ used: number; limit: number; remaining: num
             fill="transparent"
           />
         </svg>
-        <span className="absolute text-xs font-extrabold text-slate-800 dark:text-slate-200">
+        <span
+          className={`absolute text-xs font-extrabold text-text transition-transform duration-300 ${
+            animating ? 'scale-125 text-accent font-black' : ''
+          }`}
+        >
           {remaining}
         </span>
       </div>
       <div>
-        <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
+        <div className="text-sm font-bold text-text">
           {remaining} remaining
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="text-xs text-muted">
           {used} of {limit} used today
         </div>
       </div>
@@ -299,6 +314,36 @@ export const RunTools: React.FC = () => {
   const [lastSubmittedKey, setLastSubmittedKey] = useState<string>('')
   const [forceFailure, setForceFailure] = useState<boolean>(false)
 
+  // Interaction, undo/redo, and drag states
+  const [quotaAnimating, setQuotaAnimating] = useState<boolean>(false)
+  const [history, setHistory] = useState<UC05JobRecord[][]>([])
+  const [future, setFuture] = useState<UC05JobRecord[][]>([])
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
+  // Preload workload if redirected from History
+  useEffect(() => {
+    try {
+      const rawPreload = sessionStorage.getItem('workload_builder_preload')
+      if (rawPreload) {
+        sessionStorage.removeItem('workload_builder_preload')
+        const parsed = JSON.parse(rawPreload)
+        if (parsed.records && Array.isArray(parsed.records) && parsed.records.length > 0) {
+          setRecords(parsed.records)
+        }
+        if (parsed.operation) {
+          setOperation(parsed.operation)
+        }
+        if (parsed.idempotencyKey) {
+          setIdempotencyKey(parsed.idempotencyKey)
+          setReuseLastKey(true)
+          setLastSubmittedKey(parsed.idempotencyKey)
+        }
+        toast('Loaded From History', `Preloaded ${parsed.records?.length || 0} rows into builder`, 'info')
+      }
+    } catch {}
+  }, [toast])
+
   // Execution & results state
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [responseStatus, setResponseStatus] = useState<number | null>(null)
@@ -307,8 +352,9 @@ export const RunTools: React.FC = () => {
   const [validationIssues, setValidationIssues] = useState<any[]>([])
   const [showRawJson, setShowRawJson] = useState<boolean>(false)
 
-  // CSV Import Modal state
-  const [isCsvModalOpen, setIsCsvModalOpen] = useState<boolean>(false)
+  // Tools Accordion ("Describe your jobs" & CSV Import) and Advisor Accordion
+  const [isToolsAccordionOpen, setIsToolsAccordionOpen] = useState<boolean>(false)
+  const [isAdvisorOpen, setIsAdvisorOpen] = useState<boolean>(false)
   const [csvText, setCsvText] = useState<string>('')
   const [csvError, setCsvError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -608,24 +654,38 @@ export const RunTools: React.FC = () => {
     setIsRunningAll(false)
   }
 
-  const loadData = async () => {
+  const loadData = async (activeAuthToken?: string) => {
+    const currentAuthToken = activeAuthToken || token
     setStatsLoading(true)
+    setSubscription(null)
+    setToolsData(null)
     try {
       const [sub, tools] = await Promise.all([
-        getSubscription(token),
-        getTools(token),
+        getSubscription(currentAuthToken),
+        getTools(currentAuthToken),
       ])
       setSubscription(sub)
       setToolsData(tools)
     } catch (err: any) {
-      console.error(err)
+      console.error('Error fetching subscription/tools for', currentAuthToken, err)
     } finally {
       setStatsLoading(false)
     }
   }
 
+  // 1) IDENTITY REFRESH BUG FIX:
+  // On identity change: clear the last result, show skeletons, refetch /subscription, /tools
   useEffect(() => {
-    loadData()
+    // 1. Clear last result and all error states immediately
+    setLastRun(null)
+    setResponseStatus(null)
+    setRawErrorData(null)
+    setValidationIssues([])
+    setLastSubmittedKey('')
+    setShowRawJson(false)
+
+    // 2. Refetch subscription and tools for current identity
+    loadData(token)
   }, [token])
 
   useEffect(() => {
@@ -661,41 +721,146 @@ export const RunTools: React.FC = () => {
   const remainingQuota = subscription?.remaining_quota ?? subscription?.remaining ?? 0
   const dailyQuota = subscription?.daily_quota ?? subscription?.daily_limit ?? 0
   const usedToday = subscription?.used_today ?? 0
-  const isBasic = planName === 'Basic'
+
+  // 2) PROCESS & SUBMIT PERMISSIONS LOGIC
+  // Process is enabled only for an active Pro Operator.
+  const isViewer = activeTokenOption.role === 'Viewer'
+  const isSuspended = subStatus === 'Suspended' || activeTokenOption.status === 'Suspended'
+  const isBasic = planName === 'Basic' || activeTokenOption.plan === 'Basic'
+  const isProOperator = !isViewer && !isSuspended && !isBasic
+
+  let processDisabledReason: string | null = null
+  if (isViewer) {
+    processDisabledReason = 'Viewers are read-only'
+  } else if (isBasic) {
+    processDisabledReason = 'Basic plan allows validate only - upgrade to Pro'
+  } else if (isSuspended) {
+    processDisabledReason = 'Subscription suspended'
+  }
+
+  let submitDisabledReason: string | null = null
+  if (isViewer) {
+    submitDisabledReason = 'Viewers are read-only'
+  } else if (isSuspended) {
+    submitDisabledReason = 'Subscription suspended'
+  }
+
+  // If switched to an identity without process permission, reset operation to validate
+  useEffect(() => {
+    if (!isProOperator && operation === 'process') {
+      setOperation('validate')
+    }
+  }, [isProOperator, operation])
+
+  const updateRecords = useCallback(
+    (
+      newRecords: UC05JobRecord[] | ((prev: UC05JobRecord[]) => UC05JobRecord[]),
+      pushToHistory = true
+    ) => {
+      setRecords((prev) => {
+        const resolved = typeof newRecords === 'function' ? newRecords(prev) : newRecords
+        if (pushToHistory) {
+          setHistory((h) => [...h.slice(-29), prev])
+          setFuture([])
+        }
+        return resolved
+      })
+    },
+    []
+  )
+
+  const handleUndo = useCallback(() => {
+    setHistory((prevHistory) => {
+      if (prevHistory.length === 0) return prevHistory
+      const previous = prevHistory[prevHistory.length - 1]
+      const nextHistory = prevHistory.slice(0, -1)
+      setRecords((current) => {
+        setFuture((f) => [current, ...f.slice(0, 29)])
+        return previous
+      })
+      toast('Undo', 'Reverted previous table state', 'info')
+      return nextHistory
+    })
+  }, [toast])
+
+  const handleRedo = useCallback(() => {
+    setFuture((prevFuture) => {
+      if (prevFuture.length === 0) return prevFuture
+      const next = prevFuture[0]
+      const nextFuture = prevFuture.slice(1)
+      setRecords((current) => {
+        setHistory((h) => [...h.slice(-29), current])
+        return next
+      })
+      toast('Redo', 'Restored table state', 'info')
+      return nextFuture
+    })
+  }, [toast])
 
   const handleUpdateRecord = (index: number, field: keyof UC05JobRecord, value: any) => {
     const updated = [...records]
     updated[index] = { ...updated[index], [field]: value }
-    setRecords(updated)
+    updateRecords(updated)
   }
 
   const handleAddRow = () => {
     if (records.length >= 10) return
     const nextNum = records.length + 1
     const nextId = `J${String(nextNum).padStart(2, '0')}`
-    setRecords([
+    updateRecords([
       ...records,
       { record_id: nextId, tool: 'EXPORT', record_count: 10, environment: 'TEST' },
     ])
   }
 
+  const handleDuplicateRow = (index: number) => {
+    if (records.length >= 10) {
+      toast('Maximum 10 rows', 'A workload batch cannot exceed 10 records.', 'warn')
+      return
+    }
+    const source = records[index]
+    const nextNum = records.length + 1
+    const nextId = `J${String(nextNum).padStart(2, '0')}`
+    const duplicated: UC05JobRecord = {
+      ...source,
+      record_id: nextId,
+    }
+    updateRecords((prev) => {
+      const next = [...prev]
+      next.splice(index + 1, 0, duplicated)
+      return next
+    })
+    toast('Row Duplicated', `Duplicated row as ${nextId}`, 'info')
+  }
+
   const handleRemoveRow = (index: number) => {
     if (records.length <= 1) return
-    setRecords(records.filter((_, i) => i !== index))
+    updateRecords(records.filter((_, i) => i !== index))
+  }
+
+  const handleReorderRows = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return
+    updateRecords((prev) => {
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+    toast('Rows Reordered', `Moved row ${fromIndex + 1} to position ${toIndex + 1}`, 'info')
   }
 
   const handleLoadValid = () => {
-    setRecords(VALID_FIXTURE_RECORDS)
+    updateRecords(VALID_FIXTURE_RECORDS)
     toast('Loaded valid fixture (2 rows)', undefined, 'info')
   }
 
   const handleLoadInvalid = () => {
-    setRecords(INVALID_FIXTURE_RECORDS)
+    updateRecords(INVALID_FIXTURE_RECORDS)
     toast('Loaded invalid fixture (6 rows)', undefined, 'warn')
   }
 
   const handleLoadEleven = () => {
-    setRecords(ELEVEN_ROWS_FIXTURE)
+    updateRecords(ELEVEN_ROWS_FIXTURE)
     toast('Loaded 11 rows (bounds test)', undefined, 'warn')
   }
 
@@ -720,15 +885,15 @@ export const RunTools: React.FC = () => {
     if (!parsedJobResult || parsedJobResult.records.length === 0) return
     const remainingSlots = 10 - records.length
     if (remainingSlots <= 0) {
-      toast('Batch Limit Reached', 'Batch is already at the maximum of 10 rows', 'error')
+      toast('10-Row Limit Reached', 'Workload batches are strictly limited to 10 rows maximum.', 'warn')
       return
     }
     const toAdd = parsedJobResult.records.slice(0, remainingSlots)
-    setRecords((prev) => [...prev, ...toAdd])
+    updateRecords((prev) => [...prev, ...toAdd])
     if (parsedJobResult.records.length > remainingSlots) {
       toast(
-        'Rows Added (Capped)',
-        `Added ${toAdd.length} rows (capped at batch limit of 10 rows)`,
+        'Rows Added (10-Row Limit)',
+        `Added ${toAdd.length} rows (capped at batch limit of 10 rows).`,
         'warn'
       )
     } else {
@@ -761,6 +926,26 @@ export const RunTools: React.FC = () => {
       const status = result.http_status ?? 201
       setResponseStatus(status)
       setLastRun(result)
+
+      // Quota gauge animation on accepted run
+      if (status === 200 || status === 201) {
+        setQuotaAnimating(true)
+        setTimeout(() => setQuotaAnimating(false), 1800)
+      }
+
+      // Persist run inputs to localStorage for Re-run / Replay in History
+      if (result.run_id) {
+        try {
+          localStorage.setItem(
+            `run_input_${result.run_id}`,
+            JSON.stringify({
+              records,
+              operation,
+              idempotencyKey: keyToUse,
+            })
+          )
+        } catch {}
+      }
 
       if (operation === 'validate' && result.result?.issues) {
         setValidationIssues(result.result.issues)
@@ -797,22 +982,50 @@ export const RunTools: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (isViewer || isSuspended) {
+      toast('Action not permitted', submitDisabledReason || 'Execution not allowed', 'warn')
+      return
+    }
     executeSubmit()
   }
 
-  // Keyboard shortcut: Ctrl+Enter or Cmd+Enter to submit
+  // Keyboard shortcuts: Ctrl+Enter to submit, Ctrl+Z to undo, Ctrl+Y or Ctrl+Shift+Z to redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      const isCtrl = e.ctrlKey || e.metaKey
+      if (isCtrl && e.key === 'Enter') {
         e.preventDefault()
-        if (!isSubmitting && records.length > 0) {
+        if (!isSubmitting && records.length > 0 && !isViewer && !isSuspended) {
           executeSubmit()
+        }
+        return
+      }
+
+      const targetTag = (e.target as HTMLElement)?.tagName
+      const isTyping = targetTag === 'INPUT' || targetTag === 'TEXTAREA'
+
+      if (isCtrl && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+        if (!isTyping) {
+          e.preventDefault()
+          handleUndo()
+        }
+      } else if (
+        (isCtrl && (e.key === 'y' || e.key === 'Y')) ||
+        (isCtrl && (e.key === 'z' || e.key === 'Z') && e.shiftKey)
+      ) {
+        if (!isTyping) {
+          e.preventDefault()
+          handleRedo()
+        }
+      } else if (e.key === 'Escape') {
+        if (isDemoDrawerOpen) {
+          setIsDemoDrawerOpen(false)
         }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isSubmitting, records, operation, idempotencyKey, reuseLastKey, lastSubmittedKey, forceFailure, token])
+  }, [isSubmitting, records, operation, idempotencyKey, reuseLastKey, lastSubmittedKey, forceFailure, token, isViewer, isSuspended, submitDisabledReason, handleUndo, handleRedo, isDemoDrawerOpen])
 
   // Copy current request as cURL command (with placeholders, NEVER real tokens)
   const handleCopyAsCurl = () => {
@@ -842,16 +1055,15 @@ export const RunTools: React.FC = () => {
     }
 
     // Apply parsed records, cap at 10, clear all previous errors
-    setRecords(result.records)
+    updateRecords(result.records)
     setRawErrorData(null)
     setValidationIssues([])
     setLastRun(null)
     setResponseStatus(null)
-    setIsCsvModalOpen(false)
     setCsvText('')
 
     if (result.warning) {
-      toast('CSV Imported with Warning', result.warning, 'warn')
+      toast('CSV Imported (10-Row Limit)', result.warning, 'warn')
     } else {
       toast('CSV Imported', `Successfully loaded ${result.records.length} records into builder`, 'success')
     }
@@ -958,26 +1170,14 @@ export const RunTools: React.FC = () => {
     })
 
     return [
-      { name: 'EXPORT', value: exportEffort, count: exportCount, color: '#6366f1' },
-      { name: 'VALIDATE', value: validateEffort, count: validateCount, color: '#10b981' },
+      { name: 'EXPORT', value: exportEffort, count: exportCount, color: 'var(--accent)' },
+      { name: 'VALIDATE', value: validateEffort, count: validateCount, color: 'var(--success)' },
     ].filter((d) => d.count > 0 || d.value > 0)
   }, [lastRun, toolLookup])
 
-  // Effort sorted table
-  const effortSortedRows = useMemo(() => {
-    if (!lastRun?.result?.rows) return []
-    return [...lastRun.result.rows].sort(
-      (a: any, b: any) => (Number(b.estimated_ms) || 0) - (Number(a.estimated_ms) || 0)
-    )
-  }, [lastRun])
-
-  const maxEffort = useMemo(() => {
-    if (!effortSortedRows.length) return 1
-    return Math.max(...effortSortedRows.map((r: any) => Number(r.estimated_ms) || 0), 1)
-  }, [effortSortedRows])
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto w-full space-y-6">
       <PageHeader
         title="Run Tools"
         description="Configure job records to preview workload validation or execute runtime estimations."
@@ -987,16 +1187,18 @@ export const RunTools: React.FC = () => {
           { label: 'Run Tools' },
         ]}
         actions={
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsDemoDrawerOpen(true)}
-            className="gap-1.5 shadow-2xs border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/40 hover:bg-indigo-100/60 dark:hover:bg-indigo-900/60"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            Demo Scenarios
-          </Button>
+          DEMO ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsDemoDrawerOpen(true)}
+              className="gap-1.5 shadow-2xs border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/40 hover:bg-indigo-100/60 dark:hover:bg-indigo-900/60 text-[13px]"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              Demo Scenarios
+            </Button>
+          ) : undefined
         }
       />
 
@@ -1007,17 +1209,21 @@ export const RunTools: React.FC = () => {
         {/* Card 1: Plan */}
         <Card className="p-4 flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="text-[13px] font-bold text-muted uppercase tracking-wider">
               Tenant Plan
             </div>
-            <div className="text-xl font-extrabold text-slate-900 dark:text-slate-100 mt-1 flex items-center gap-2">
-              {planName}
-              <Badge variant={subStatus === 'Active' ? 'success' : 'danger'}>
-                {subStatus}
-              </Badge>
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Role: <strong className="text-slate-700 dark:text-slate-300">{activeTokenOption.role}</strong>
+            {statsLoading ? (
+              <Skeleton className="w-28 h-7 mt-1.5" />
+            ) : (
+              <div className="text-xl font-extrabold text-text mt-1 flex items-center gap-2">
+                {planName}
+                <Badge variant={subStatus === 'Active' ? 'success' : 'danger'} className="text-[13px]">
+                  {subStatus}
+                </Badge>
+              </div>
+            )}
+            <div className="text-[13px] text-muted mt-1">
+              Role: <strong className="text-text">{activeTokenOption.role}</strong>
             </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
@@ -1028,7 +1234,7 @@ export const RunTools: React.FC = () => {
         {/* Card 2: Remaining runs today (Circular gauge) */}
         <Card className="p-4 flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            <div className="text-[13px] font-bold text-muted uppercase tracking-wider mb-1">
               Daily Quota Gauge
             </div>
             {statsLoading ? (
@@ -1038,10 +1244,11 @@ export const RunTools: React.FC = () => {
                 used={usedToday}
                 limit={dailyQuota}
                 remaining={remainingQuota}
+                animating={quotaAnimating}
               />
             )}
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-surface-muted text-muted flex items-center justify-center">
             <Layers className="w-5 h-5" />
           </div>
         </Card>
@@ -1049,23 +1256,27 @@ export const RunTools: React.FC = () => {
         {/* Card 3: Allowed operations */}
         <Card className="p-4 flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="text-[13px] font-bold text-muted uppercase tracking-wider">
               Allowed Operations
             </div>
-            <div className="text-base font-bold text-slate-900 dark:text-slate-100 mt-1 flex items-center gap-1.5 flex-wrap">
-              {(toolsData?.allowed_operations || (planName === 'Pro' ? ['validate', 'process'] : ['validate'])).map(
-                (op) => (
-                  <Badge
-                    key={op}
-                    variant={op === 'process' ? 'info' : 'default'}
-                    className="font-mono uppercase text-xs"
-                  >
-                    {op}
-                  </Badge>
-                )
-              )}
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            {statsLoading ? (
+              <Skeleton className="w-32 h-6 mt-1.5" />
+            ) : (
+              <div className="text-base font-bold text-text mt-1 flex items-center gap-1.5 flex-wrap">
+                {(toolsData?.allowed_operations || (planName === 'Pro' ? ['validate', 'process'] : ['validate'])).map(
+                  (op) => (
+                    <Badge
+                      key={op}
+                      variant={op === 'process' ? 'info' : 'default'}
+                      className="font-mono uppercase text-[13px]"
+                    >
+                      {op}
+                    </Badge>
+                  )
+                )}
+              </div>
+            )}
+            <div className="text-[13px] text-muted mt-1">
               Rate: {toolsData?.rate_ms_per_record ?? 10} ms / record estimation
             </div>
           </div>
@@ -1077,53 +1288,59 @@ export const RunTools: React.FC = () => {
 
       {/* ------------------------------------------------------------------- */}
       {/* TWO-COLUMN LAYOUT: Left (Request Builder) | Right (Result Panel)     */}
+      {/* 2 columns above 1024px (lg:), 1 column below                        */}
       {/* ------------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* LEFT COLUMN: Request Builder */}
-        <div className="lg:col-span-6 space-y-4">
+        <div className="space-y-4">
           <Card className="p-5">
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Header & Operation Toggle */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Request Builder</h2>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Configure workload batch</p>
+                  <h2 className="text-sm font-bold text-text">Request Builder</h2>
+                  <p className="text-[13px] text-muted">Configure workload batch</p>
                 </div>
 
-                {/* Operation Toggle */}
-                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => setOperation('validate')}
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                      operation === 'validate'
-                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    Validate
-                  </button>
-                  <div className="relative group">
+                {/* Operation Toggle & Process Permission Handling */}
+                <div>
+                  <div className="flex items-center gap-1.5 bg-surface-muted p-1 rounded-lg border border-border">
                     <button
                       type="button"
-                      disabled={isBasic}
-                      onClick={() => !isBasic && setOperation('process')}
-                      className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                        isBasic
-                          ? 'opacity-40 cursor-not-allowed text-slate-400'
-                          : operation === 'process'
-                          ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      onClick={() => setOperation('validate')}
+                      className={`px-3 py-1.5 rounded-md text-[13px] font-semibold transition-all cursor-pointer ${
+                        operation === 'validate'
+                          ? 'bg-surface text-accent shadow-2xs'
+                          : 'text-text-secondary hover:text-text'
                       }`}
                     >
-                      Process
+                      Validate
                     </button>
-                    {isBasic && (
-                      <span className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:block bg-slate-800 text-white text-[10px] py-0.5 px-2 rounded whitespace-nowrap shadow-md z-30">
-                        Upgrade to Pro
-                      </span>
-                    )}
+                    <div className="relative group">
+                      <button
+                        type="button"
+                        disabled={!isProOperator}
+                        onClick={() => isProOperator && setOperation('process')}
+                        title={processDisabledReason || 'Execute process workload on Pro plan'}
+                        className={`px-3 py-1.5 rounded-md text-[13px] font-semibold transition-all ${
+                          !isProOperator
+                            ? 'opacity-40 cursor-not-allowed text-muted'
+                            : operation === 'process'
+                            ? 'bg-surface text-accent shadow-2xs cursor-pointer'
+                            : 'text-text-secondary hover:text-text cursor-pointer'
+                        }`}
+                      >
+                        Process
+                      </button>
+                    </div>
                   </div>
+                  {/* Visible reason line under the toggle */}
+                  {processDisabledReason && (
+                    <div className="text-[13px] font-medium text-amber-600 dark:text-amber-400 mt-1.5 flex items-center justify-end gap-1">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{processDisabledReason}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1139,34 +1356,26 @@ export const RunTools: React.FC = () => {
                   <Button type="button" variant="secondary" size="sm" onClick={handleLoadEleven}>
                     11 rows
                   </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setIsCsvModalOpen(true)}
-                    className="gap-1 text-slate-700 dark:text-slate-300"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    CSV Import
-                  </Button>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCopyAsCurl}
-                  className="gap-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                  title="Copy as cURL command (uses placeholders for Auth and Idempotency key)"
-                >
-                  <Terminal className="w-3.5 h-3.5" />
-                  Copy as curl
-                </Button>
+                {DEMO && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopyAsCurl}
+                    className="gap-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                    title="Copy as cURL command (uses placeholders for Auth and Idempotency key)"
+                  >
+                    <Terminal className="w-3.5 h-3.5" />
+                    Copy as curl
+                  </Button>
+                )}
               </div>
 
               {/* LIVE CLIENT-SIDE VALIDATION PREVIEW BAR */}
               <div
-                className={`p-2.5 rounded-lg border text-xs flex items-center justify-between flex-wrap gap-2 transition-all ${
+                className={`p-2.5 rounded-lg border text-[13px] flex items-center justify-between flex-wrap gap-2 transition-all ${
                   clientValidation.isValid
                     ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900 dark:bg-emerald-950/30 dark:border-emerald-800/60 dark:text-emerald-300'
                     : 'bg-amber-50/70 border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800/60 dark:text-amber-300'
@@ -1195,112 +1404,195 @@ export const RunTools: React.FC = () => {
                 </div>
               </div>
 
-              {/* "Describe your jobs" Smart Builder Card */}
-              <div className="p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/40 via-white to-slate-50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-slate-900 space-y-3 shadow-2xs">
-                <div className="flex items-center justify-between flex-wrap gap-2">
+              {/* Tools Accordion: Smart Builder ("Describe your jobs") & CSV Import */}
+              <div className="border border-border rounded-xl overflow-hidden bg-surface shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setIsToolsAccordionOpen((prev) => !prev)}
+                  className="w-full px-4 py-2.5 flex items-center justify-between text-left text-[13px] font-semibold text-text hover:bg-surface-muted transition-colors cursor-pointer"
+                >
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                    <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                      Describe your jobs
-                    </h3>
+                    <Wrench className="w-4 h-4 text-accent" />
+                    <span>Tools (Smart Builder &amp; CSV Import)</span>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                    Smart builder - rule-based, runs in your browser
-                  </span>
-                </div>
+                  <ChevronDown
+                    className={`w-4 h-4 text-muted transition-transform duration-200 ${
+                      isToolsAccordionOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
 
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Type job requirements in plain text (e.g. <em>&quot;export 500 records in stage as J10; validate 40 records in test as J11&quot;</em>).
-                </p>
-
-                <textarea
-                  value={jobPromptText}
-                  onChange={(e) => setJobPromptText(e.target.value)}
-                  placeholder="export 500 records in stage as J10; validate 40 records in test as J11"
-                  rows={2}
-                  className="w-full text-xs font-mono p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleGenerateRows}
-                    disabled={!jobPromptText.trim()}
-                    className="gap-1.5 text-xs text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/50"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                    Generate rows
-                  </Button>
-
-                  {parsedJobResult && parsedJobResult.records.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="primary"
-                      size="sm"
-                      onClick={handleAddToTable}
-                      disabled={records.length >= 10}
-                      className="gap-1.5 text-xs"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add to table ({parsedJobResult.records.length})
-                    </Button>
-                  )}
-                </div>
-
-                {/* Preview of Generated Rows & Unparseable Warnings */}
-                {parsedJobResult && (
-                  <div className="space-y-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
-                    {/* Generated preview chips */}
-                    {parsedJobResult.records.length > 0 && (
-                      <div className="space-y-1.5">
-                        <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                          Preview Generated Rows ({parsedJobResult.records.length}):
+                {isToolsAccordionOpen && (
+                  <div className="p-4 border-t border-border space-y-4 bg-surface-muted/20">
+                    {/* Part 1: Describe your jobs */}
+                    <div className="space-y-3 p-3.5 rounded-lg border border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/40 via-white to-slate-50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-slate-900">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <h4 className="text-[13px] font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                            Describe your jobs
+                          </h4>
                         </div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {parsedJobResult.records.map((r, i) => (
-                            <span
-                              key={i}
-                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs"
-                            >
-                              <strong className="text-slate-900 dark:text-slate-100">{r.record_id}</strong>
-                              <Badge variant={r.tool === 'VALIDATE' ? 'success' : 'info'} className="text-[10px] py-0 px-1">
-                                {r.tool}
-                              </Badge>
-                              <span className="text-slate-600 dark:text-slate-400">{r.record_count}</span>
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">{r.environment}</span>
-                            </span>
-                          ))}
-                        </div>
+                        <span className="text-[11px] font-mono px-2 py-0.5 rounded font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          Smart builder - rule-based, runs in your browser
+                        </span>
                       </div>
-                    )}
 
-                    {/* Warnings & Unparseable parts */}
-                    {parsedJobResult.unparseable.length > 0 && (
-                      <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-[11px] text-rose-800 dark:text-rose-300 space-y-1">
-                        <div className="font-semibold flex items-center gap-1 text-rose-700 dark:text-rose-400">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          Unparseable clauses (never guessed):
-                        </div>
-                        <ul className="list-disc list-inside space-y-0.5 font-mono text-[10px]">
-                          {parsedJobResult.unparseable.map((u, i) => (
-                            <li key={i}>{u}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                      <p className="text-[13px] text-slate-500 dark:text-slate-400">
+                        Type job requirements in plain English (e.g. <em>&quot;export 500 records in stage as J10; validate 40 records in test as J11&quot;</em>).
+                      </p>
 
-                    {parsedJobResult.warnings.length > 0 && (
-                      <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-[11px] text-amber-800 dark:text-amber-300 space-y-0.5">
-                        {parsedJobResult.warnings.map((w, i) => (
-                          <div key={i} className="flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                            <span>{w}</span>
-                          </div>
-                        ))}
+                      <textarea
+                        value={jobPromptText}
+                        onChange={(e) => setJobPromptText(e.target.value)}
+                        placeholder="export 500 records in stage as J10; validate 40 records in test as J11"
+                        rows={2}
+                        className="w-full text-[13px] font-mono p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleGenerateRows}
+                          disabled={!jobPromptText.trim()}
+                          className="gap-1.5 text-[13px] text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/50"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          Generate rows
+                        </Button>
+
+                        {parsedJobResult && parsedJobResult.records.length > 0 && (
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            onClick={handleAddToTable}
+                            disabled={records.length >= 10}
+                            className="gap-1.5 text-[13px]"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Add to table ({parsedJobResult.records.length})
+                          </Button>
+                        )}
                       </div>
-                    )}
+
+                      {/* Preview of Generated Rows & Unparseable Warnings */}
+                      {parsedJobResult && (
+                        <div className="space-y-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                          {parsedJobResult.records.length > 0 && (
+                            <div className="space-y-1.5">
+                              <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                Preview Generated Rows ({parsedJobResult.records.length}):
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {parsedJobResult.records.map((r, i) => (
+                                  <span
+                                    key={i}
+                                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                                  >
+                                    <strong className="text-slate-900 dark:text-slate-100">{r.record_id}</strong>
+                                    <Badge variant={r.tool === 'VALIDATE' ? 'success' : 'info'} className="text-[10px] py-0 px-1">
+                                      {r.tool}
+                                    </Badge>
+                                    <span className="text-slate-600 dark:text-slate-400">{r.record_count}</span>
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">{r.environment}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {parsedJobResult.unparseable.length > 0 && (
+                            <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-[11px] text-rose-800 dark:text-rose-300 space-y-1">
+                              <div className="font-semibold flex items-center gap-1 text-rose-700 dark:text-rose-400">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                Unparseable clauses (never guessed):
+                              </div>
+                              <ul className="list-disc list-inside space-y-0.5 font-mono text-[10px]">
+                                {parsedJobResult.unparseable.map((u, i) => (
+                                  <li key={i}>{u}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {parsedJobResult.warnings.length > 0 && (
+                            <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-[11px] text-amber-800 dark:text-amber-300 space-y-0.5">
+                              {parsedJobResult.warnings.map((w, i) => (
+                                <div key={i} className="flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                                  <span>{w}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Part 2: CSV Import */}
+                    <div className="space-y-3 p-3.5 rounded-lg border border-border bg-surface">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <Upload className="w-4 h-4 text-accent" />
+                          <h4 className="text-[13px] font-bold text-text uppercase tracking-wider">
+                            CSV Import
+                          </h4>
+                        </div>
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          accept=".csv,text/csv,text/plain"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="gap-1 text-[13px]"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          Choose .csv File
+                        </Button>
+                      </div>
+
+                      <p className="text-[13px] text-muted">
+                        Paste CSV lines with columns: <code>record_id, tool, record_count, environment</code> (max 10 rows).
+                      </p>
+
+                      <textarea
+                        value={csvText}
+                        onChange={(e) => setCsvText(e.target.value)}
+                        placeholder={"record_id,tool,record_count,environment\nJ01,EXPORT,250,STAGE\nJ02,VALIDATE,50,TEST"}
+                        rows={3}
+                        className="w-full text-[13px] font-mono p-2.5 rounded-lg border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+
+                      {csvError && (
+                        <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-[13px] text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{csvError}</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          onClick={handleApplyCsv}
+                          disabled={!csvText.trim()}
+                          className="gap-1.5 text-[13px]"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          Import CSV into Table
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1308,39 +1600,64 @@ export const RunTools: React.FC = () => {
               {/* Editable Rows Table */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                    Records ({records.length} of 10)
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[13px] font-bold text-muted uppercase tracking-wider">
+                      Records ({records.length} of 10)
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={handleUndo}
+                        disabled={history.length === 0}
+                        title="Undo row edit (Ctrl+Z)"
+                        aria-label="Undo row edit"
+                        className="p-1 rounded text-muted hover:text-text hover:bg-surface-muted disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-colors"
+                      >
+                        <Undo2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRedo}
+                        disabled={future.length === 0}
+                        title="Redo row edit (Ctrl+Y)"
+                        aria-label="Redo row edit"
+                        className="p-1 rounded text-muted hover:text-text hover:bg-surface-muted disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-colors"
+                      >
+                        <Redo2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={handleAddRow}
                     disabled={records.length >= 10}
-                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700"
+                    className="text-accent hover:text-accent/80 text-[13px]"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Add Row
                   </Button>
                 </div>
 
-                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="overflow-x-auto rounded-lg border border-border">
                   <table
-                    className="w-full text-left text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 rounded"
+                    className="w-full text-left text-[13px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
                     tabIndex={0}
                     aria-label="Job records input table"
                   >
-                    <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800">
+                    <thead className="bg-surface-muted/60 text-muted font-semibold border-b border-border text-[13px]">
                       <tr>
-                        <th className="py-2 px-2.5 w-8 text-center">#</th>
-                        <th className="py-2 px-2.5">Record ID</th>
-                        <th className="py-2 px-2.5 w-24">Tool</th>
-                        <th className="py-2 px-2.5 w-20">Count</th>
-                        <th className="py-2 px-2.5 w-24">Env</th>
-                        <th className="py-2 px-1 text-center w-8"></th>
+                        <th className="py-2.5 px-1 w-7 text-center" title="Drag row handle to reorder"></th>
+                        <th className="py-2.5 px-2 w-10 text-center">#</th>
+                        <th className="py-2.5 px-2.5 min-w-[120px]">Record ID</th>
+                        <th className="py-2.5 px-2.5 min-w-[140px] w-[145px]">Tool</th>
+                        <th className="py-2.5 px-2.5 min-w-[90px] w-[95px]">Count</th>
+                        <th className="py-2.5 px-2.5 min-w-[120px] w-[125px]">Env</th>
+                        <th className="py-2.5 px-2 text-center w-16">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                    <tbody className="divide-y divide-border bg-surface text-[13px]">
                       {records.map((rec, idx) => {
                         const serverIssues = getRowIssues(idx + 1)
                         const clientIssues = clientValidation.issues.filter(
@@ -1352,36 +1669,75 @@ export const RunTools: React.FC = () => {
                         return (
                           <React.Fragment key={idx}>
                             <tr
-                              className={
-                                hasServerIssue
-                                  ? 'bg-rose-50/50 dark:bg-rose-950/30'
+                              onDragOver={(e) => {
+                                e.preventDefault()
+                                e.dataTransfer.dropEffect = 'move'
+                                if (dragOverIndex !== idx) setDragOverIndex(idx)
+                              }}
+                              onDragLeave={() => {
+                                if (dragOverIndex === idx) setDragOverIndex(null)
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault()
+                                if (draggedIndex !== null && draggedIndex !== idx) {
+                                  handleReorderRows(draggedIndex, idx)
+                                }
+                                setDraggedIndex(null)
+                                setDragOverIndex(null)
+                              }}
+                              className={`transition-colors ${
+                                dragOverIndex === idx
+                                  ? 'border-t-2 border-accent bg-accent/10'
+                                  : hasServerIssue
+                                  ? 'bg-danger/10'
                                   : hasClientIssue
-                                  ? 'bg-amber-50/40 dark:bg-amber-950/20'
-                                  : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/30'
-                              }
+                                  ? 'bg-warning/10'
+                                  : 'hover:bg-surface-muted/50'
+                              } ${draggedIndex === idx ? 'opacity-30' : ''}`}
                             >
-                              <td className="py-2 px-2.5 text-center text-slate-400 font-mono text-[11px]">
+                              <td className="py-2 px-1 text-center text-muted">
+                                <div
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData('text/plain', String(idx))
+                                    e.dataTransfer.effectAllowed = 'move'
+                                    setDraggedIndex(idx)
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggedIndex(null)
+                                    setDragOverIndex(null)
+                                  }}
+                                  className="p-1 inline-flex items-center justify-center rounded hover:bg-surface-muted cursor-grab active:cursor-grabbing text-muted hover:text-text"
+                                  title="Drag to reorder row"
+                                  aria-label={`Drag to reorder row ${idx + 1}`}
+                                >
+                                  <GripVertical className="w-3.5 h-3.5" />
+                                </div>
+                              </td>
+                              <td className="py-2 px-2 text-center text-muted font-mono text-[13px]">
                                 {idx + 1}
                               </td>
                               <td className="py-1.5 px-2.5">
                                 <input
                                   type="text"
                                   value={rec.record_id}
+                                  aria-label={`Record ID row ${idx + 1}`}
                                   onChange={(e) => handleUpdateRecord(idx, 'record_id', e.target.value)}
-                                  className={`w-full bg-slate-50 dark:bg-slate-800 border rounded px-2 py-1 text-xs font-mono focus:bg-white dark:focus:bg-slate-900 focus:outline-none ${
+                                  className={`w-full bg-surface-muted border rounded px-2.5 py-1.5 text-[13px] font-mono text-text focus:bg-surface focus:outline-none ${
                                     hasServerIssue
-                                      ? 'border-rose-400 ring-1 ring-rose-400'
+                                      ? 'border-danger ring-1 ring-danger'
                                       : hasClientIssue
-                                      ? 'border-amber-400 ring-1 ring-amber-400'
-                                      : 'border-slate-200 dark:border-slate-700'
+                                      ? 'border-warning ring-1 ring-warning'
+                                      : 'border-border focus:border-accent'
                                   }`}
                                 />
                               </td>
                               <td className="py-1.5 px-2.5">
                                 <select
                                   value={rec.tool}
+                                  aria-label={`Tool row ${idx + 1}`}
                                   onChange={(e) => handleUpdateRecord(idx, 'tool', e.target.value)}
-                                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-1 text-xs focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
+                                  className="w-full min-w-[130px] bg-surface-muted border border-border text-text rounded px-2.5 py-1.5 text-[13px] font-medium focus:bg-surface focus:outline-none focus:border-accent"
                                 >
                                   <option value="EXPORT">EXPORT</option>
                                   <option value="VALIDATE">VALIDATE</option>
@@ -1390,19 +1746,24 @@ export const RunTools: React.FC = () => {
                               </td>
                               <td className="py-1.5 px-2.5">
                                 <input
-                                  type="number"
+                                  type="text"
                                   value={rec.record_count}
-                                  onChange={(e) =>
-                                    handleUpdateRecord(idx, 'record_count', parseInt(e.target.value, 10) || 0)
-                                  }
-                                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs font-mono focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
+                                  aria-label={`Record count row ${idx + 1}`}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    const trimmed = val.trim()
+                                    const parsed = /^-?\d+$/.test(trimmed) ? parseInt(trimmed, 10) : val
+                                    handleUpdateRecord(idx, 'record_count', parsed)
+                                  }}
+                                  className="w-full bg-surface-muted border border-border text-text rounded px-2.5 py-1.5 text-[13px] font-mono focus:bg-surface focus:outline-none focus:border-accent"
                                 />
                               </td>
                               <td className="py-1.5 px-2.5">
                                 <select
                                   value={rec.environment}
+                                  aria-label={`Environment row ${idx + 1}`}
                                   onChange={(e) => handleUpdateRecord(idx, 'environment', e.target.value)}
-                                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-1 text-xs focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
+                                  className="w-full min-w-[110px] bg-surface-muted border border-border text-text rounded px-2.5 py-1.5 text-[13px] font-medium focus:bg-surface focus:outline-none focus:border-accent"
                                 >
                                   <option value="TEST">TEST</option>
                                   <option value="STAGE">STAGE</option>
@@ -1410,20 +1771,34 @@ export const RunTools: React.FC = () => {
                                 </select>
                               </td>
                               <td className="py-1.5 px-1 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveRow(idx)}
-                                  disabled={records.length <= 1}
-                                  className="text-slate-400 hover:text-rose-600 disabled:opacity-20 p-1"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDuplicateRow(idx)}
+                                    disabled={records.length >= 10}
+                                    title="Duplicate row"
+                                    aria-label={`Duplicate row ${idx + 1}`}
+                                    className="text-muted hover:text-accent disabled:opacity-20 p-1 rounded hover:bg-surface-muted cursor-pointer transition-colors"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveRow(idx)}
+                                    disabled={records.length <= 1}
+                                    title="Delete row"
+                                    aria-label={`Delete row ${idx + 1}`}
+                                    className="text-muted hover:text-danger disabled:opacity-20 p-1 rounded hover:bg-surface-muted cursor-pointer transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                             {/* Server-returned error row */}
                             {hasServerIssue && (
-                              <tr className="bg-rose-50/70 dark:bg-rose-950/40 border-b border-rose-100 dark:border-rose-900/40">
-                                <td colSpan={6} className="py-1 px-3 text-[11px] text-rose-700 dark:text-rose-300">
+                              <tr className="bg-danger/10 border-b border-danger/20">
+                                <td colSpan={7} className="py-1 px-3 text-[11px] text-danger">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="font-semibold">Row {idx + 1} Server Issue:</span>
                                     {serverIssues.map((iss, i) => (
@@ -1437,8 +1812,8 @@ export const RunTools: React.FC = () => {
                             )}
                             {/* Live client-side preview warnings when no server errors yet */}
                             {hasClientIssue && (
-                              <tr className="bg-amber-50/60 dark:bg-amber-950/30 border-b border-amber-100 dark:border-amber-900/40">
-                                <td colSpan={6} className="py-1 px-3 text-[11px] text-amber-700 dark:text-amber-300">
+                              <tr className="bg-warning/10 border-b border-warning/20">
+                                <td colSpan={7} className="py-1 px-3 text-[11px] text-warning">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="font-semibold">Row {idx + 1} Preview:</span>
                                     {clientIssues.map((iss, i) => (
@@ -1461,10 +1836,10 @@ export const RunTools: React.FC = () => {
               {/* Idempotency Key & Replay Demonstrator */}
               <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  <label className="text-[13px] font-semibold text-slate-600 dark:text-slate-400">
                     Idempotency-Key
                   </label>
-                  <label className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 cursor-pointer">
+                  <label className="flex items-center gap-1 text-[13px] text-slate-500 dark:text-slate-400 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={reuseLastKey}
@@ -1480,7 +1855,7 @@ export const RunTools: React.FC = () => {
                     value={reuseLastKey && lastSubmittedKey ? lastSubmittedKey : idempotencyKey}
                     onChange={(e) => setIdempotencyKey(e.target.value)}
                     disabled={reuseLastKey && !!lastSubmittedKey}
-                    className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs font-mono text-slate-700 dark:text-slate-300 focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
+                    className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2.5 py-1.5 text-[13px] font-mono text-slate-700 dark:text-slate-300 focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
                   />
                   <Button
                     type="button"
@@ -1497,37 +1872,48 @@ export const RunTools: React.FC = () => {
 
               {/* Dev-only failure hook & Submit Button */}
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
-                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={forceFailure}
-                    onChange={(e) => setForceFailure(e.target.checked)}
-                    className="rounded border-slate-300 text-indigo-600 focus:ring-0"
-                  />
-                  Simulate failure (<code>X-Force-Failure: true</code>)
-                </label>
+                {DEMO ? (
+                  <label className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={forceFailure}
+                      onChange={(e) => setForceFailure(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-0"
+                    />
+                    Simulate failure (<code>X-Force-Failure: true</code>)
+                  </label>
+                ) : (
+                  <div />
+                )}
 
-                <Button
-                  type="submit"
-                  variant="primary"
-                  isLoading={isSubmitting}
-                  disabled={isSubmitting || records.length === 0}
-                  className="gap-1.5"
-                  title="Submit workload (Ctrl+Enter)"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Submit Workload</span>
-                  <span className="text-[10px] opacity-75 font-mono px-1 py-0.2 bg-indigo-700/60 rounded">
-                    Ctrl+↵
-                  </span>
-                </Button>
+                <div className="flex items-center gap-3 flex-wrap">
+                  {submitDisabledReason && (
+                    <span className="text-[13px] font-medium text-amber-600 dark:text-amber-400">
+                      {submitDisabledReason}
+                    </span>
+                  )}
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    isLoading={isSubmitting}
+                    disabled={isSubmitting || records.length === 0 || isViewer || isSuspended}
+                    className="gap-1.5 text-[13px]"
+                    title={submitDisabledReason || 'Submit workload (Ctrl+Enter)'}
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Submit Workload</span>
+                    <span className="text-[11px] opacity-75 font-mono px-1 py-0.2 bg-indigo-700/60 rounded">
+                      Ctrl+↵
+                    </span>
+                  </Button>
+                </div>
               </div>
             </form>
           </Card>
         </div>
 
         {/* RIGHT COLUMN: Result Panel & Visualizations */}
-        <div className="lg:col-span-6 space-y-4">
+        <div className="space-y-4">
           {/* Printable Report Wrapper Container */}
           <div className="print-report-container space-y-4">
             {/* Header visible only when printed */}
@@ -1609,70 +1995,69 @@ export const RunTools: React.FC = () => {
                 </div>
 
                 {/* Plain words status banner with "What this means" */}
-                <div
-                  className={`p-4 rounded-xl border space-y-1 ${
-                    responseStatus === 201
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300'
-                      : responseStatus === 200
-                      ? 'bg-indigo-50 border-indigo-200 text-indigo-900 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300'
-                      : responseStatus === 429
-                      ? 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300'
-                      : 'bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="font-bold text-sm flex items-center gap-1.5">
-                      {responseStatus === 201 && '201 Created & Accepted'}
-                      {responseStatus === 200 && '200 OK — Idempotent Replay'}
-                      {responseStatus === 400 && '400 Bad Request'}
-                      {responseStatus === 401 && '401 Unauthorized'}
-                      {responseStatus === 403 && '403 Forbidden'}
-                      {responseStatus === 409 && '409 Conflict (RUN_IN_PROGRESS / Key Reuse)'}
-                      {responseStatus === 429 && '429 Daily Quota Exhausted'}
-                      {![200, 201, 400, 401, 403, 409, 429].includes(responseStatus) &&
-                        `${responseStatus} Response`}
+                {responseStatus && (
+                  <div
+                    className={`p-4 rounded-xl border space-y-1 ${
+                      responseStatus === 201
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300'
+                        : responseStatus === 200
+                        ? 'bg-indigo-50 border-indigo-200 text-indigo-900 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300'
+                        : responseStatus === 429
+                        ? 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300'
+                        : 'bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-sm flex items-center gap-1.5">
+                        {responseStatus === 201 && '201 Created — Run Accepted & Processed'}
+                        {responseStatus === 200 && '200 OK — Idempotent Replay'}
+                        {responseStatus === 400 && '400 Bad Request — Schema or Rule Violation'}
+                        {responseStatus === 401 && '401 Unauthorized — Authentication Required'}
+                        {responseStatus === 403 && '403 Forbidden — Insufficient Permissions'}
+                        {responseStatus === 404 && '404 Not Found — Resource or Run Not Found'}
+                        {responseStatus === 409 && '409 Conflict — RUN_IN_PROGRESS or Key Reuse'}
+                        {responseStatus === 429 && '429 Quota Exceeded — Daily Limit Reached'}
+                        {![200, 201, 400, 401, 403, 404, 409, 429].includes(responseStatus) &&
+                          `HTTP ${responseStatus} Response`}
+                      </div>
+                      <Badge
+                        variant={
+                          responseStatus === 201 || responseStatus === 200
+                            ? 'success'
+                            : responseStatus === 429
+                            ? 'warn'
+                            : 'danger'
+                        }
+                      >
+                        HTTP {responseStatus}
+                      </Badge>
                     </div>
-                    <Badge
-                      variant={
-                        responseStatus === 201 || responseStatus === 200
-                          ? 'success'
-                          : responseStatus === 429
-                          ? 'warn'
-                          : 'danger'
-                      }
-                    >
-                      HTTP {responseStatus}
-                    </Badge>
+                    <div className="text-xs opacity-90 flex items-start gap-1 mt-1">
+                      <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span>
+                        <strong>What this means: </strong>
+                        {responseStatus === 201 &&
+                          'Workload was accepted into SQL, 1 quota slot debited, and execution completed.'}
+                        {responseStatus === 200 &&
+                          'Idempotent replay: this Idempotency-Key was previously processed. Replaying existing result with 0 quota debit.'}
+                        {responseStatus === 400 &&
+                          'Request violated structural bounds (bounds, schema, or process with invalid rows). 0 quota used.'}
+                        {responseStatus === 401 &&
+                          'Authentication token missing or invalid. Verify Bearer token credentials.'}
+                        {responseStatus === 403 &&
+                          'Permission denied: Viewer role cannot create runs, subscription suspended, or Basic plan cannot execute process.'}
+                        {responseStatus === 404 &&
+                          'Requested run ID, endpoint, or resource was not found.'}
+                        {responseStatus === 409 &&
+                          'Run with this key is currently in progress (RUN_IN_PROGRESS), or key was reused with a different payload.'}
+                        {responseStatus === 429 &&
+                          'Daily tenant quota exhausted (Basic: 3/day, Pro: 10/day). Resets at 00:00 UTC.'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-xs opacity-90 flex items-start gap-1 mt-1">
-                    <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                    <span>
-                      <strong>What this means: </strong>
-                      {responseStatus === 201 &&
-                        'Workload was accepted into SQL, 1 quota slot debited, and execution completed.'}
-                      {responseStatus === 200 &&
-                        'Same Idempotency-Key matched an earlier run; returning existing result with 0 additional quota debit.'}
-                      {responseStatus === 400 &&
-                        'Request violated structural bounds (bounds, schema, or process with invalid rows). 0 quota used.'}
-                      {responseStatus === 401 &&
-                        'Authentication token missing or invalid. Verify Bearer token credentials.'}
-                      {responseStatus === 403 &&
-                        'Permission denied: Viewer role cannot create runs, subscription suspended, or Basic plan cannot execute process.'}
-                      {responseStatus === 409 &&
-                        'Run with this key is currently in progress, or key was reused with a different payload.'}
-                      {responseStatus === 429 &&
-                        'Daily tenant limit reached (Basic: 3/day, Pro: 10/day). Resets at 00:00 UTC.'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Workload Advisor Card */}
-                {lastRun && lastRun.result && (
-                  <WorkloadAdvisor
-                    operation={lastRun.operation}
-                    result={lastRun.result}
-                  />
                 )}
+
+
 
                 {/* Succeeded Result View */}
                 {lastRun && lastRun.status === 'Succeeded' && lastRun.result && (
@@ -1869,15 +2254,15 @@ export const RunTools: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* 3. Table Sorted by Effort (estimated_ms descending) */}
+                        {/* 3. Rows Table (record_id, estimated_ms, order preserved) */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                              <ArrowUpDown className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                              Job Effort Breakdown (Sorted by Effort Descending)
+                              <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                              Rows Table (Order Preserved)
                             </div>
-                            <span className="text-[10px] text-slate-500">
-                              {effortSortedRows.length} jobs analyzed
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {lastRun.result.rows?.length || 0} rows
                             </span>
                           </div>
 
@@ -1885,18 +2270,16 @@ export const RunTools: React.FC = () => {
                             <table className="w-full text-left text-xs">
                               <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 uppercase font-semibold">
                                 <tr>
-                                  <th className="py-2 px-3 w-12 text-center">Rank</th>
-                                  <th className="py-2 px-3">Record ID</th>
+                                  <th className="py-2 px-3 w-12 text-center">#</th>
+                                  <th className="py-2 px-3 font-semibold">Record ID</th>
                                   <th className="py-2 px-3 w-28">Tool</th>
-                                  <th className="py-2 px-3 text-right">Effort (ms)</th>
-                                  <th className="py-2 px-3 w-36">Relative Share</th>
+                                  <th className="py-2 px-3 text-right font-semibold">Estimated ms</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                                {effortSortedRows.map((r: any, idx: number) => {
+                                {lastRun.result.rows?.map((r: any, idx: number) => {
                                   const ms = Number(r.estimated_ms) || 0
                                   const tool = toolLookup.get(r.record_id) || 'EXPORT'
-                                  const pct = Math.round((ms / maxEffort) * 100)
                                   return (
                                     <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                                       <td className="py-1.5 px-3 text-center text-slate-400 font-bold">
@@ -1915,14 +2298,6 @@ export const RunTools: React.FC = () => {
                                       </td>
                                       <td className="py-1.5 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
                                         {ms} ms
-                                      </td>
-                                      <td className="py-1.5 px-3">
-                                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                                          <div
-                                            className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full transition-all"
-                                            style={{ width: `${pct}%` }}
-                                          />
-                                        </div>
                                       </td>
                                     </tr>
                                   )
@@ -1943,7 +2318,7 @@ export const RunTools: React.FC = () => {
                       <AlertTriangle className="w-4 h-4 text-rose-600" />
                       Recorded Execution Error
                     </div>
-                    <p className="font-mono text-xs text-rose-700 dark:text-rose-300 bg-white dark:bg-slate-900 p-2.5 rounded border border-rose-200 dark:border-rose-800">
+                    <p className="font-mono text-xs text-danger bg-surface p-2.5 rounded border border-danger/30">
                       {lastRun.error || 'Execution failed'}
                     </p>
                   </Card>
@@ -1953,10 +2328,42 @@ export const RunTools: React.FC = () => {
                 {rawErrorData && (
                   <Card className="p-4 bg-rose-50/50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900 space-y-2">
                     <div className="text-xs font-bold text-rose-900 dark:text-rose-300">Error Payload</div>
-                    <pre className="text-[11px] font-mono text-rose-800 dark:text-rose-200 bg-white dark:bg-slate-900 p-2.5 rounded border border-rose-200 dark:border-rose-800 overflow-x-auto max-h-48">
+                    <pre className="text-[11px] font-mono text-danger bg-surface p-2.5 rounded border border-danger/30 overflow-x-auto max-h-48">
                       {JSON.stringify(rawErrorData, null, 2)}
                     </pre>
                   </Card>
+                )}
+
+                {/* Collapsible Workload Advisor under the result */}
+                {lastRun && lastRun.result && (
+                  <div className="rounded-xl border border-border bg-surface shadow-2xs overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setIsAdvisorOpen((prev) => !prev)}
+                      className="w-full px-4 py-2.5 flex items-center justify-between text-left text-[13px] font-semibold text-text hover:bg-surface-muted transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-indigo-500" />
+                        <span>Workload Advisor Insights</span>
+                        <span className="text-[11px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          Smart suggestions
+                        </span>
+                      </div>
+                      <ChevronDown
+                        className={`w-4 h-4 text-muted transition-transform duration-200 ${
+                          isAdvisorOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </button>
+                    {isAdvisorOpen && (
+                      <div className="p-3 border-t border-border">
+                        <WorkloadAdvisor
+                          operation={lastRun.operation}
+                          result={lastRun.result}
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Collapsible Raw JSON with Copy Button */}
@@ -1994,146 +2401,47 @@ export const RunTools: React.FC = () => {
         </div>
       </div>
 
-      {/* CSV Import Modal */}
-      {isCsvModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsCsvModalOpen(false)}
-          />
-          <div className="relative bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                  Import CSV Rows
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCsvModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
-              <p>
-                Paste CSV text below or upload a .csv file. Header row is optional. Max 10 rows (batch boundary).
-              </p>
-              <p className="font-mono text-[11px] bg-slate-50 dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
-                record_id,tool,record_count,environment<br />
-                J01,EXPORT,20,TEST<br />
-                J02,VALIDATE,10,STAGE
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  CSV Content
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept=".csv,text/csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="gap-1 text-xs"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    Upload File
-                  </Button>
-                </div>
-              </div>
-
-              <textarea
-                value={csvText}
-                onChange={(e) => setCsvText(e.target.value)}
-                placeholder="record_id,tool,record_count,environment&#10;J01,EXPORT,25,TEST&#10;J02,VALIDATE,15,STAGE"
-                rows={6}
-                className="w-full font-mono text-xs p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
-              />
-            </div>
-
-            {csvError && (
-              <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
-                {csvError}
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setIsCsvModalOpen(false)
-                  setCsvText('')
-                  setCsvError(null)
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                onClick={handleApplyCsv}
-                disabled={!csvText.trim()}
-                className="gap-1"
-              >
-                <Check className="w-4 h-4" />
-                Import & Clear Previous Errors
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Demo Scenarios Drawer */}
       {isDemoDrawerOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Interactive Demo Scenarios"
+          className="fixed inset-0 z-50 overflow-hidden"
+        >
           <div
             className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
             onClick={() => setIsDemoDrawerOpen(false)}
           />
           <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-            <div className="w-screen max-w-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800">
+            <div className="w-screen max-w-2xl bg-surface shadow-2xl flex flex-col border-l border-border">
               {/* Drawer Header */}
-              <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex items-start justify-between gap-4">
+              <div className="p-5 border-b border-border bg-surface-muted/50 flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                    <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                    <Sparkles className="w-5 h-5 text-accent" />
+                    <h2 className="text-base font-bold text-text">
                       Interactive Demo Scenarios
                     </h2>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     Live verification running REAL backend HTTP requests. PASS/FAIL computed directly from real responses.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsDemoDrawerOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800"
+                  className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-surface-muted"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Action bar */}
-              <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+              <div className="p-4 border-b border-border bg-surface flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted">
                   9 Live Verification Scenarios
                 </span>
                 <Button
@@ -2158,7 +2466,7 @@ export const RunTools: React.FC = () => {
                   return (
                     <div
                       key={sc.id}
-                      className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700 transition-all space-y-2.5 shadow-2xs"
+                      className="p-4 rounded-xl border border-border bg-surface hover:border-accent/40 transition-all space-y-2.5 shadow-2xs"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>

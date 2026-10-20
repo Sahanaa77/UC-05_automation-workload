@@ -76,7 +76,7 @@ export function parseJobRecordsCsv(rawCsv: string): CsvParseResult {
   let parsedRows = dataRows
 
   if (parsedRows.length > 10) {
-    warning = `CSV contains ${parsedRows.length} rows. Only the first 10 rows were imported (maximum batch boundary).`
+    warning = `CSV contains ${parsedRows.length} rows. Maximum batch limit is 10 rows; only the first 10 rows were imported.`
     parsedRows = parsedRows.slice(0, 10)
   }
 
@@ -85,19 +85,33 @@ export function parseJobRecordsCsv(rawCsv: string): CsvParseResult {
     const row = parsedRows[i]
     if (row.length === 0 || (row.length === 1 && !row[0])) continue
 
-    const recordId = row[idIdx] ? String(row[idIdx]).trim() : `J${String(i + 1).padStart(2, '0')}`
-    const rawTool = row[toolIdx] ? String(row[toolIdx]).trim().toUpperCase() : 'EXPORT'
-    const tool = rawTool === 'VALIDATE' ? 'VALIDATE' : 'EXPORT'
-    const rawCount = row[countIdx] ? parseInt(String(row[countIdx]).replace(/[^0-9]/g, ''), 10) : 10
-    const recordCount = isNaN(rawCount) || rawCount <= 0 ? 10 : Math.min(1000, rawCount)
-    const rawEnv = row[envIdx] ? String(row[envIdx]).trim().toUpperCase() : 'TEST'
-    const environment = rawEnv === 'STAGE' ? 'STAGE' : 'TEST'
+    // Keep original case of record_id, trimmed
+    const rawId = row[idIdx] !== undefined ? String(row[idIdx]).trim() : ''
+    const recordId = rawId !== '' ? rawId : `J${String(i + 1).padStart(2, '0')}`
+
+    // Trim other fields
+    const rawTool = row[toolIdx] !== undefined ? String(row[toolIdx]).trim() : ''
+    const tool = rawTool !== '' ? rawTool.toUpperCase() : 'EXPORT'
+
+    // Convert record_count to real integer if whole number; keep original text if not
+    const rawCountStr = row[countIdx] !== undefined ? String(row[countIdx]).trim() : ''
+    let recordCount: number | string = 10
+    if (rawCountStr === '') {
+      recordCount = 10
+    } else if (/^-?\d+$/.test(rawCountStr)) {
+      recordCount = parseInt(rawCountStr, 10)
+    } else {
+      recordCount = rawCountStr
+    }
+
+    const rawEnv = row[envIdx] !== undefined ? String(row[envIdx]).trim() : ''
+    const environment = rawEnv !== '' ? rawEnv.toUpperCase() : 'TEST'
 
     records.push({
       record_id: recordId,
-      tool: tool as 'EXPORT' | 'VALIDATE',
+      tool,
       record_count: recordCount,
-      environment: environment as 'TEST' | 'STAGE',
+      environment,
     })
   }
 

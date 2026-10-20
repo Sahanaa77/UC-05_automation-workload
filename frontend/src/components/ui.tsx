@@ -483,12 +483,21 @@ export const Tabs: React.FC<TabsProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`flex border-b border-border gap-4 ${className}`}>
+    <div
+      role="tablist"
+      aria-orientation="horizontal"
+      className={`flex border-b border-border gap-4 ${className}`}
+    >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id
         return (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={isActive}
+            id={`tab-${tab.id}`}
+            aria-controls={`tabpanel-${tab.id}`}
+            tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(tab.id)}
             className={`pb-2.5 text-xs font-semibold border-b-2 transition-all -mb-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-t cursor-pointer ${
               isActive
@@ -572,3 +581,47 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// WorkloadLensLogo (SVG Logo Mark matching favicon.svg)
+// ---------------------------------------------------------------------------
+export const WorkloadLensLogo: React.FC<{ className?: string; size?: number }> = ({
+  className = '',
+  size = 32,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 32 32"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={`flex-shrink-0 ${className}`}
+    aria-label="WorkloadLens logo mark"
+  >
+    <defs>
+      <linearGradient id="lensGradUi" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#4f46e5" />
+        <stop offset="100%" stopColor="#312e81" />
+      </linearGradient>
+      <linearGradient id="lensCheckUi" x1="10" y1="14" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="100%" stopColor="#c7d2fe" />
+      </linearGradient>
+    </defs>
+    <rect width="32" height="32" rx="8" fill="url(#lensGradUi)" />
+    <path
+      d="M16 6L8 9.5V15.5C8 21 11.5 26 16 27.5C20.5 26 24 21 24 15.5V9.5L16 6Z"
+      stroke="#a5b4fc"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+      fill="rgba(255, 255, 255, 0.12)"
+    />
+    <path
+      d="M12 16.5L14.8 19.5L20.5 13.5"
+      stroke="url(#lensCheckUi)"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)

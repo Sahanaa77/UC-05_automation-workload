@@ -1,33 +1,29 @@
 import React, { useState, useEffect, ReactNode, useRef } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Badge, Modal, Button, ThemeToggle, useTheme } from './ui'
-import { checkHealth } from '../lib/api'
+import { Badge, ThemeToggle, useTheme, WorkloadLensLogo } from './ui'
+import { checkHealth, DEMO } from '../lib/api'
 import {
-  Layers,
   Zap,
   History,
   Menu,
   X,
   UserCheck,
-  Shield,
-  HelpCircle,
   Command,
   Search,
   Sparkles,
   Lock,
-  ArrowRight,
   Sun,
   Moon,
   Laptop,
   CheckCircle2,
   AlertCircle,
   FileText,
-  Sliders,
+  ChevronDown,
 } from 'lucide-react'
 
 export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { token, setToken, activeTokenOption, tokens } = useAuth()
+  const { token, setToken, activeTokenOption, tokens, subscription } = useAuth()
   const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
@@ -36,7 +32,20 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [paletteQuery, setPaletteQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false)
+  const [identityPopoverOpen, setIdentityPopoverOpen] = useState(false)
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setIdentityPopoverOpen(false)
+      }
+    }
+    if (identityPopoverOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [identityPopoverOpen])
 
   // Live system health status from GET /health polling every 30s
   const [healthStatus, setHealthStatus] = useState<'healthy' | 'offline' | 'checking'>('checking')
@@ -66,24 +75,9 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
     }
   }, [])
 
-  // Onboarding "How it works" modal on first visit
-  useEffect(() => {
-    try {
-      const hasSeen = localStorage.getItem('workloadlens-onboarding-seen')
-      if (!hasSeen) {
-        setHowItWorksOpen(true)
-      }
-    } catch {}
-  }, [])
 
-  const closeHowItWorks = () => {
-    setHowItWorksOpen(false)
-    try {
-      localStorage.setItem('workloadlens-onboarding-seen', 'true')
-    } catch {}
-  }
 
-  // Command palette keyboard shortcut (Ctrl+K / Cmd+K)
+  // Keyboard shortcuts (Ctrl+K for palette, Escape to close modals)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -91,6 +85,10 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
         setCommandPaletteOpen((prev) => !prev)
         setPaletteQuery('')
         setSelectedIndex(0)
+      } else if (e.key === 'Escape') {
+        setCommandPaletteOpen(false)
+        setIdentityPopoverOpen(false)
+        setMobileMenuOpen(false)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -225,15 +223,6 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
       action: () => setTheme('system'),
       badge: theme === 'system' ? 'Selected' : undefined,
     },
-    // Help
-    {
-      id: 'help-how-it-works',
-      title: 'How It Works Guide',
-      subtitle: 'Open the 3-step automation preview orientation walkthrough',
-      category: 'Help',
-      icon: <HelpCircle className="w-4 h-4 text-indigo-500" />,
-      action: () => setHowItWorksOpen(true),
-    },
   ]
 
   const filteredCommands = commands.filter(
@@ -256,23 +245,21 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
   }, [commandPaletteOpen])
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row text-text font-sans transition-colors duration-200">
       {/* Mobile Top Bar */}
-      <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
+      <div className="md:hidden bg-surface border-b border-border px-4 py-3 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-xs">
-            <Layers className="w-4 h-4" />
-          </div>
+          <WorkloadLensLogo size={32} />
           <div>
-            <div className="font-bold text-sm text-slate-900 dark:text-slate-100 leading-tight">WorkloadLens</div>
-            <div className="text-[10px] text-slate-500 dark:text-slate-400">Automation workload preview</div>
+            <div className="font-bold text-sm text-text leading-tight">WorkloadLens</div>
+            <div className="text-[10px] text-muted">Automation workload preview</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+            className="p-1.5 rounded-lg border border-border text-muted hover:text-text hover:bg-surface-muted cursor-pointer"
             aria-label="Toggle Navigation"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -284,18 +271,16 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
       <aside
         className={`${
           mobileMenuOpen ? 'block' : 'hidden'
-        } md:flex flex-col w-full md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-shrink-0 z-30 md:sticky md:top-0 md:h-screen transition-colors duration-200`}
+        } md:flex flex-col w-full md:w-64 bg-surface border-r border-border flex-shrink-0 z-30 md:sticky md:top-0 md:h-screen transition-colors duration-200`}
       >
         {/* Brand Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800/80 hidden md:flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm shadow-indigo-600/30">
-            <Layers className="w-5 h-5" />
-          </div>
+        <div className="p-5 border-b border-border hidden md:flex items-center gap-3">
+          <WorkloadLensLogo size={36} />
           <div>
-            <div className="font-bold text-base text-slate-900 dark:text-slate-100 tracking-tight leading-tight">
+            <div className="font-bold text-base text-text tracking-tight leading-tight">
               WorkloadLens
             </div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+            <div className="text-[11px] text-muted font-medium">
               Automation workload preview
             </div>
           </div>
@@ -354,37 +339,31 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
             </kbd>
           </button>
         </div>
-
-        {/* Sidebar Footer info */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-          <Shield className="w-3.5 h-3.5 text-indigo-500" />
-          <span>Tenant Isolated Environment</span>
-        </div>
       </aside>
 
       {/* Main Column */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="bg-white dark:bg-slate-900 border-b border-slate-200/90 dark:border-slate-800 px-5 py-3 sticky top-0 z-20 shadow-2xs transition-colors duration-200">
+        <header className="bg-surface border-b border-border px-5 py-3 sticky top-0 z-20 shadow-2xs transition-colors duration-200">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             {/* Left: Active Identity Badges + Live Status Dot */}
             <div className="flex flex-wrap items-center gap-2">
               {/* System Live Status Dot from GET /health */}
               <div
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-medium border bg-surface-muted border-border cursor-default"
                 title={
                   healthStatus === 'healthy'
-                    ? 'System Status: Operational (GET /health polling every 30s)'
+                    ? 'GET /health 200 OK — API Live (polling every 30s)'
                     : 'System Status: Degraded or API unreachable'
                 }
               >
                 {healthStatus === 'healthy' ? (
-                  <span className="relative flex h-2 w-2">
+                  <span className="relative flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                   </span>
                 ) : (
-                  <span className="inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                  <span className="inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
                 )}
                 <span
                   className={
@@ -398,31 +377,36 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
               </div>
 
               {/* Tenant context badges */}
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 ml-1">
+              <span className="text-[13px] font-semibold text-text ml-1">
                 {activeTokenOption.tenant}
               </span>
 
-              <Badge variant="default">{activeTokenOption.role}</Badge>
+              <Badge variant="default" className="text-[13px] px-2.5 py-0.5">
+                {activeTokenOption.role}
+              </Badge>
 
               {/* Plan Badge with Pro-feature Lock Icons */}
-              {activeTokenOption.plan === 'Pro' ? (
-                <Badge variant="info" className="gap-1" title="Pro Plan: Full processing enabled & 10 daily quota">
-                  <Sparkles className="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
+              {(subscription?.plan || activeTokenOption.plan) === 'Pro' ? (
+                <Badge variant="info" className="gap-1 text-[13px] px-2.5 py-0.5" title="Pro Plan: Full processing enabled & 10 daily quota">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                   Pro Plan
                 </Badge>
               ) : (
                 <Badge
                   variant="default"
-                  className="gap-1 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60"
+                  className="gap-1 text-[13px] px-2.5 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60"
                   title="Basic Plan: Processing locked (validate only) & 3 daily quota"
                 >
-                  <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                  <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   Basic Plan (Pro Locked)
                 </Badge>
               )}
 
-              <Badge variant={activeTokenOption.status === 'Active' ? 'success' : 'danger'}>
-                {activeTokenOption.status}
+              <Badge
+                variant={(subscription?.status || activeTokenOption.status) === 'Active' ? 'success' : 'danger'}
+                className="text-[13px] px-2.5 py-0.5"
+              >
+                {subscription?.status || activeTokenOption.status}
               </Badge>
             </div>
 
@@ -432,12 +416,12 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
               <button
                 type="button"
                 onClick={() => setCommandPaletteOpen(true)}
-                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 rounded-lg focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none transition-colors cursor-pointer"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-text-secondary bg-surface-muted hover:bg-surface border border-border rounded-lg focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none transition-colors cursor-pointer"
                 title="Open Command Palette (Ctrl+K)"
               >
-                <Command className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                <span className="text-[11px] font-medium">Commands</span>
-                <kbd className="px-1 text-[10px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-slate-500 dark:text-slate-400">
+                <Command className="w-4 h-4 text-accent" />
+                <span className="font-medium">Commands</span>
+                <kbd className="px-1.5 py-0.5 text-[11px] bg-surface border border-border rounded text-muted shadow-2xs">
                   Ctrl+K
                 </kbd>
               </button>
@@ -445,40 +429,103 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
               {/* Theme Toggle (Light / Dark) */}
               <ThemeToggle />
 
-              {/* "?" Help Button */}
-              <button
-                type="button"
-                onClick={() => setHowItWorksOpen(true)}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none transition-colors cursor-pointer"
-                title="How it works guide"
-                aria-label="How it works guide"
-              >
-                <HelpCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              </button>
+              {/* DEMO-only Demo Identities Panel Popover */}
+              {DEMO && (
+                <div className="relative" ref={popoverRef}>
+                  <button
+                    type="button"
+                    aria-expanded={identityPopoverOpen}
+                    aria-haspopup="dialog"
+                    aria-label="Demo identities switcher"
+                    onClick={() => setIdentityPopoverOpen((prev) => !prev)}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-surface hover:bg-surface-muted border border-border text-text text-[13px] rounded-lg font-medium shadow-2xs focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none transition-colors cursor-pointer"
+                    title="Open Demo identities (dev only)"
+                  >
+                    <UserCheck className="w-4 h-4 text-accent" />
+                    <span className="hidden sm:inline font-semibold">
+                      {activeTokenOption.label}
+                    </span>
+                    <span className="sm:hidden font-semibold">
+                      {activeTokenOption.role}
+                    </span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-muted transition-transform duration-200 ${
+                        identityPopoverOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
 
-              {/* Dev-only Demo Identity Switcher */}
-              <div className="flex items-center gap-1.5">
-                <label
-                  htmlFor="demo-identity-select"
-                  className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 whitespace-nowrap"
-                >
-                  <UserCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  <span className="hidden sm:inline">Demo identity:</span>
-                </label>
-                <select
-                  id="demo-identity-select"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-xs rounded-lg px-2 py-1.5 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none transition-all cursor-pointer"
-                  title="Switch dev authentication token (never sends a tenant field)"
-                >
-                  {tokens.map((t) => (
-                    <option key={t.token} value={t.token}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  {identityPopoverOpen && (
+                    <div
+                      role="dialog"
+                      aria-label="Demo identities switcher"
+                      className="absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl border border-border bg-surface p-3 shadow-xl z-50 space-y-2 animate-in fade-in zoom-in-95"
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b border-border">
+                        <div className="text-[13px] font-bold text-text flex items-center gap-1.5">
+                          <UserCheck className="w-4 h-4 text-accent" />
+                          <span>Demo identities (dev only)</span>
+                        </div>
+                        <span className="text-[11px] font-mono text-muted bg-surface-muted px-1.5 py-0.5 rounded">
+                          token-switch
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                        {tokens.map((t) => {
+                          const isActive = t.token === token
+                          return (
+                            <button
+                              key={t.token}
+                              type="button"
+                              onClick={() => {
+                                setToken(t.token)
+                                setIdentityPopoverOpen(false)
+                              }}
+                              className={`w-full text-left p-2.5 rounded-lg border transition-all cursor-pointer ${
+                                isActive
+                                  ? 'bg-accent/10 border-accent text-text'
+                                  : 'bg-surface-muted/40 border-border hover:bg-surface-muted hover:border-slate-300 dark:hover:border-slate-700 text-text-secondary hover:text-text'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="text-[13px] font-bold text-text flex items-center gap-1.5">
+                                  <span>{t.label}</span>
+                                  {isActive && (
+                                    <span className="text-[10px] font-semibold text-accent uppercase tracking-wider bg-accent/15 px-1.5 py-0.2 rounded">
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
+                                <Badge
+                                  variant={t.status === 'Active' ? 'success' : 'danger'}
+                                  className="text-[11px] px-1.5 py-0"
+                                >
+                                  {t.status}
+                                </Badge>
+                              </div>
+                              <div className="text-[12px] text-muted mt-1 font-medium flex items-center gap-1.5 flex-wrap">
+                                <span>{t.tenant}</span>
+                                <span>&bull;</span>
+                                <span>{t.role}</span>
+                                <span>&bull;</span>
+                                <span>{t.plan} Plan</span>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      <div className="pt-2 border-t border-border text-[11px] text-muted flex items-center justify-between">
+                        <span>Never sends tenant field</span>
+                        <kbd className="px-1 py-0.5 font-mono text-[10px] bg-surface-muted rounded border border-border">
+                          Bearer auth
+                        </kbd>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -489,77 +536,7 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
         </main>
       </div>
 
-      {/* ------------------------------------------------------------------- */}
-      {/* "HOW IT WORKS" MODAL (First visit + "?" button)                    */}
-      {/* ------------------------------------------------------------------- */}
-      <Modal
-        isOpen={howItWorksOpen}
-        onClose={closeHowItWorks}
-        title="How WorkloadLens Works"
-        maxWidth="max-w-xl"
-      >
-        <div className="space-y-4">
-          <p className="text-xs text-slate-600 dark:text-slate-300">
-            Welcome to <strong className="font-semibold text-indigo-600 dark:text-indigo-400">WorkloadLens</strong>. This preview SaaS platform lets automation operators simulate, test, and estimate scheduled workload runs with tenant isolation and quota enforcement.
-          </p>
 
-          <div className="space-y-3.5 pt-1">
-            {/* Step 1 */}
-            <div className="flex gap-3 items-start p-3 rounded-lg border border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/40">
-              <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
-                1
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  Build Job Batches
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Define 1 to 10 automated job records specifying Tool (EXPORT/VALIDATE), Record count, and Environment. You can also load standard verification fixtures with one click.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 2 */}
-            <div className="flex gap-3 items-start p-3 rounded-lg border border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/40">
-              <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
-                2
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  Validate & Process
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Run validation previews (Basic or Pro) or full workload processing (exclusive to Pro plan). Each submission uses an Idempotency-Key header to prevent duplicate execution or quota over-debiting.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="flex gap-3 items-start p-3 rounded-lg border border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/40">
-              <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
-                3
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                  <History className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  Review History & Telemetry
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Inspect immutable run execution logs, SHA-256 payload fingerprints, cloud blob results, daily usage quotas, and automated advisor recommendations for run optimization.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-            <Button variant="primary" size="sm" onClick={closeHowItWorks} className="gap-1.5">
-              Get Started <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
       {/* ------------------------------------------------------------------- */}
       {/* COMMAND PALETTE MODAL (Ctrl+K)                                      */}
@@ -573,12 +550,12 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
           onClick={() => setCommandPaletteOpen(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[80vh]"
+            className="bg-surface border border-border rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[80vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Search Input Bar */}
-            <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
-              <Search className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+            <div className="p-3.5 border-b border-border flex items-center gap-3">
+              <Search className="w-4 h-4 text-muted" />
               <input
                 ref={paletteInputRef}
                 type="text"
@@ -604,17 +581,17 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
                   }
                 }}
                 placeholder="Type a command or search (e.g. tools, theme, fixture, tenant)..."
-                className="flex-1 bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+                className="flex-1 bg-transparent text-sm text-text placeholder-muted focus:outline-none"
               />
-              <kbd className="px-2 py-0.5 text-[10px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded">
+              <kbd className="px-2 py-0.5 text-[10px] font-semibold text-muted bg-surface-muted border border-border rounded">
                 ESC
               </kbd>
             </div>
 
             {/* Results List */}
-            <div className="overflow-y-auto p-2 divide-y divide-slate-100 dark:divide-slate-800/60 space-y-1">
+            <div className="overflow-y-auto p-2 divide-y divide-border/60 space-y-1">
               {filteredCommands.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
+                <div className="py-8 text-center text-xs text-muted">
                   No commands matching "{paletteQuery}"
                 </div>
               ) : (
@@ -628,12 +605,12 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
                       onMouseEnter={() => setSelectedIndex(idx)}
                       className={`w-full text-left p-2.5 rounded-lg flex items-center justify-between gap-3 transition-colors cursor-pointer ${
                         isSelected
-                          ? 'bg-indigo-50 dark:bg-indigo-950/60 text-slate-900 dark:text-slate-100'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300'
+                          ? 'bg-accent/10 text-text'
+                          : 'hover:bg-surface-muted text-text-secondary'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="p-1.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs flex-shrink-0">
+                        <div className="p-1.5 rounded-md bg-surface border border-border shadow-2xs flex-shrink-0">
                           {item.icon}
                         </div>
                         <div className="min-w-0">
