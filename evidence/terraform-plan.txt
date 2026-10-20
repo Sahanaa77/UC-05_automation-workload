@@ -1,0 +1,80 @@
+data.azurerm_resource_group.main: Reading...
+data.azurerm_resource_group.main: Read complete after 1s [id=/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo]
+data.azurerm_storage_account.data: Reading...
+data.azurerm_storage_account.data: Read complete after 1s [id=/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.Storage/storageAccounts/uc05storef6ea8975]
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # azurerm_container_app.api will be created
+  + resource "azurerm_container_app" "api" {
+      + container_app_environment_id  = "/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.App/managedEnvironments/uc05-env"
+      + id                            = (known after apply)
+      + latest_revision_fqdn          = (known after apply)
+      + name                          = "workloadlens-api-dev"
+      + resource_group_name           = "rg-uc05-demo"
+      + revision_mode                 = "Single"
+      + tags = {
+          + "environment" = "dev"
+          + "managed_by"  = "terraform"
+          + "project"     = "workloadlens"
+        }
+
+      + ingress {
+          + external_enabled = true
+          + target_port      = 8000
+          + transport        = "http"
+          + traffic_weight {
+              + latest_revision = true
+              + percentage      = 100
+            }
+        }
+
+      + secret {
+          # (sensitive value — database-url)
+        }
+
+      + template {
+          + max_replicas = 1
+          + min_replicas = 0
+          + container {
+              + cpu    = 0.25
+              + image  = "uc05registry7bef65da.azurecr.io/workloadlens:latest"
+              + memory = "0.5Gi"
+              + name   = "workloadlens-api"
+              + env { name = "TEST_MODE"    value = "0" }
+              + env { name = "DATABASE_URL" secret_name = "database-url" }
+              + liveness_probe {
+                  + failure_count_threshold = 3
+                  + initial_delay           = 15
+                  + interval_seconds        = 30
+                  + path                    = "/health"
+                  + port                    = 8000
+                  + transport               = "HTTP"
+                }
+            }
+        }
+    }
+
+  # azurerm_storage_container.data will be created
+  + resource "azurerm_storage_container" "data" {
+      + container_access_type = "private"
+      + name                  = "workloadlens-data"
+      + storage_account_name  = "uc05storef6ea8975"
+    }
+
+Plan: 2 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + blob_container_name  = "workloadlens-data"
+  + container_app_fqdn   = (known after apply)
+  + container_app_name   = "workloadlens-api-dev"
+  + resource_group_name  = "rg-uc05-demo"
+  + storage_account_id   = "/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.Storage/storageAccounts/uc05storef6ea8975"
+  + storage_account_name = "uc05storef6ea8975"
+
+Captured: 2026-10-20T12:11Z  Branch: feature/uc05-infra-docs  Commit: pre-592
+NOTE: Subscription ID redacted. Secret values suppressed by Terraform (sensitive=true).
