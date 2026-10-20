@@ -1,34 +1,14 @@
 
-name: Build and Push UC05 Backend
-
-on:
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to ACR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ secrets.ACR_LOGIN_SERVER }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
-
       - name: Verify Dockerfile
         run: |
           pwd
           ls -la
-          ls -la backend
-          test -f backend/Dockerfile
+          test -f Dockerfile
 
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./backend/Dockerfile
+          file: ./Dockerfile
           push: true
           tags: uc05registry7bef65da.azurecr.io/uc05-backend:v1
