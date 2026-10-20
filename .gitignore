@@ -31,3 +31,22 @@ backend/*.egg-info/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+*.tfvars.json
+
+# Local sqlite database
+*.db
+
+# Local blob storage folder
+.blob_local/
+backend/.blob_local/
+**/.blob_local/
+
+# Python egg-info
+*.egg-info/
+

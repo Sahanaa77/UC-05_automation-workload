@@ -1,169 +1,143 @@
-import { BoundsConfig, ModelDefinition, ModelRecord, Run } from '../types'
+import {
+  UC05JobRecord,
+  UC05Subscription,
+  UC05WorkloadRun,
+} from '../types'
 
 const API_BASE = '/api'
 
-export async function checkHealth(): Promise<{ status: string; version: string }> {
+export class ApiError extends Error {
+  status: number
+  data: any
+  constructor(message: string, status: number, data?: any) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.data = data
+  }
+}
+
+export function formatApiErrorMessage(status: number, data: any): string {
+  const detail = data?.detail
+  let detailMsg = ''
+  if (typeof detail === 'string') {
+    detailMsg = detail
+  } else if (detail && typeof detail === 'object') {
+    if (detail.message) {
+      detailMsg = detail.message
+    } else if (detail.issues) {
+      detailMsg = `Validation failed with ${detail.issues.length} issue(s).`
+    } else {
+      detailMsg = JSON.stringify(detail)
+    }
+  }
+
+  switch (status) {
+    case 400:
+      return `400 Bad Request: ${detailMsg || 'Invalid request structure, missing fields, or validation rules failed.'}`
+    case 401:
+      return `401 Unauthorized: ${detailMsg || 'Missing or invalid authentication token.'}`
+    case 403:
+      return `403 Forbidden: ${detailMsg || 'Action not permitted for current role, plan, or subscription status.'}`
+    case 409:
+      return `409 Conflict: ${detailMsg || 'Idempotency conflict: key already used or run in progress.'}`
+    case 429:
+      return `429 Daily Limit Reached: ${detailMsg || 'Daily quota exhausted for this tenant. Limit resets at 00:00 UTC.'}`
+    default:
+      return `${status} Error: ${detailMsg || 'An error occurred during request execution.'}`
+  }
+}
+
+export async function checkHealth(): Promise<{ status: string }> {
   const res = await fetch(`${API_BASE}/health`)
-  if (!res.ok) throw new Error(`Health check failed: ${res.statusText}`)
+  if (!res.ok) throw new ApiError(`Health check failed: ${res.statusText}`, res.status)
   return res.json()
 }
 
-export async function getModels(): Promise<ModelRecord[]> {
-  const res = await fetch(`${API_BASE}/models`)
-  if (!res.ok) throw new Error(`Failed to fetch models: ${res.statusText}`)
-  return res.json()
-}
-
-export async function createModel(name: string, definition: ModelDefinition): Promise<ModelRecord> {
-  const res = await fetch(`${API_BASE}/models`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, definition }),
+export async function getSubscription(token: string): Promise<UC05Subscription> {
+  const res = await fetch(`${API_BASE}/subscription`, {
+    headers: { Authorization: `Bearer ${token}` },
   })
+  const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}))
-    throw new Error(errorData.detail?.errors?.join(', ') || 'Failed to create model')
+    throw new ApiError(formatApiErrorMessage(res.status, data), res.status, data)
   }
-  return res.json()
+  return data
 }
 
-export async function validateModel(definition: ModelDefinition): Promise<{
-  valid: boolean
-  errors: string[]
-  summary?: {
-    tenants: string[]
-    plans: string[]
-    invariants: string[]
-    event_count: number
-  }
-}> {
-  const res = await fetch(`${API_BASE}/models/validate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ definition }),
+export interface ToolsApiResponse {
+  tools: Array<{
+    name: string
+    description: string
+    environments: string[]
+  }>
+  allowed_operations: string[]
+  rate_ms_per_record: number
+}
+
+export async function getTools(token: string): Promise<ToolsApiResponse> {
+  const res = await fetch(`${API_BASE}/tools`, {
+    headers: { Authorization: `Bearer ${token}` },
   })
-  if (!res.ok) throw new Error(`Validation request failed: ${res.statusText}`)
-  return res.json()
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new ApiError(formatApiErrorMessage(res.status, data), res.status, data)
+  }
+  return data
 }
 
-export async function getRuns(): Promise<Run[]> {
-  const res = await fetch(`${API_BASE}/runs`)
-  if (!res.ok) throw new Error(`Failed to fetch runs: ${res.statusText}`)
-  return res.json()
-}
+export async function createWorkloadRun(
+  operation: 'validate' | 'process',
+  records: UC05JobRecord[],
+  idempotencyKey: string,
+  token: string,
+  forceFailure: boolean = false
+): Promise<UC05WorkloadRun> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+    'Idempotency-Key': idempotencyKey,
+  }
+  if (forceFailure) {
+    headers['X-Force-Failure'] = 'true'
+  }
 
-export async function createRun(modelId: string, bounds: BoundsConfig, fixed: boolean = false): Promise<Run> {
+  // NOTE: Strictly never send tenant_id in body
   const res = await fetch(`${API_BASE}/runs`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model_id: modelId, bounds, fixed }),
+    headers,
+    body: JSON.stringify({ operation, records }),
   })
-  if (!res.ok) throw new Error(`Failed to create run: ${res.statusText}`)
-  return res.json()
-}
 
-export async function getRun(runId: string): Promise<Run> {
-  const res = await fetch(`${API_BASE}/runs/${runId}`)
-  if (!res.ok) throw new Error(`Failed to fetch run: ${res.statusText}`)
-  return res.json()
-}
-
-export async function minimizeCounterexample(cxId: string): Promise<{
-  id: string
-  original_len: number
-  minimal_len: number
-  minimal_trace: Record<string, any>[]
-  state_diffs: any[]
-  replays: number
-  duration_ms: number
-}> {
-  const res = await fetch(`${API_BASE}/counterexamples/${cxId}/minimize`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error(`Minimization failed: ${res.statusText}`)
-  return res.json()
-}
-
-export async function rerunCounterexample(cxId: string, fixed: boolean = true): Promise<{
-  passed: boolean
-  trace_results: any[]
-  message?: string
-}> {
-  const res = await fetch(`${API_BASE}/counterexamples/${cxId}/rerun`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fixed }),
-  })
-  if (!res.ok) throw new Error(`Rerun failed: ${res.statusText}`)
-  return res.json()
-}
-
-export async function exportCounterexample(cxId: string, format: 'pytest' | 'json' = 'pytest'): Promise<{
-  filename: string
-  content: string
-  format: string
-}> {
-  const res = await fetch(`${API_BASE}/counterexamples/${cxId}/export?format=${format}`)
-  if (!res.ok) throw new Error(`Export failed: ${res.statusText}`)
-  return res.json()
-}
-
-export async function exportSuite(runId: string): Promise<{
-  files: Array<{ filename: string; content: string }>
-}> {
-  const res = await fetch(`${API_BASE}/runs/${runId}/export-suite`)
-  if (!res.ok) throw new Error(`Suite export failed: ${res.statusText}`)
-  return res.json()
-}
-
-export interface SimulateStepResult {
-  step: number
-  event: Record<string, any>
-  expected: Record<string, any>
-  observed: Record<string, any>
-  violations: Array<{ id: string; tenant: string; message: string }>
-}
-
-export async function simulateEvents(
-  model: ModelDefinition,
-  events: Array<Record<string, any>>,
-  fixed: boolean = false
-): Promise<SimulateStepResult[]> {
-  const res = await fetch(`${API_BASE}/simulate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, events, fixed }),
-  })
+  const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || `Simulation failed: ${res.statusText}`)
+    throw new ApiError(formatApiErrorMessage(res.status, data), res.status, data)
   }
-  return res.json()
+  data.http_status = res.status
+  return data
 }
 
-export async function getHandlerSource(bug: string = 'B2'): Promise<{
-  bug: string
-  file: string
-  start_line: number
-  end_line: number
-  source: string
-  code: string
-  lines: string[]
-  guard_lines?: number[]
-}> {
-  const res = await fetch(`${API_BASE}/handlers/source?bug=${encodeURIComponent(bug)}`)
-  if (!res.ok) throw new Error(`Failed to fetch handler source: ${res.statusText}`)
-  return res.json()
-}
-
-export async function resetDemoData(): Promise<{ status: string; message: string }> {
-  const res = await fetch(`${API_BASE}/admin/reset`, {
-    method: 'POST',
+export async function getWorkloadRuns(token: string): Promise<UC05WorkloadRun[]> {
+  const res = await fetch(`${API_BASE}/runs`, {
+    headers: { Authorization: `Bearer ${token}` },
   })
+  const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || `Reset demo data failed: ${res.statusText}`)
+    throw new ApiError(formatApiErrorMessage(res.status, data), res.status, data)
   }
-  return res.json()
+  return data
 }
 
+export async function getWorkloadRunResult(
+  runId: string,
+  token: string
+): Promise<UC05WorkloadRun> {
+  const res = await fetch(`${API_BASE}/runs/${runId}/result`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new ApiError(formatApiErrorMessage(res.status, data), res.status, data)
+  }
+  return data
+}
