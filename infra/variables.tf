@@ -59,11 +59,35 @@ variable "container_image" {
 
 variable "database_url" {
   description = <<-EOT
-    PostgreSQL connection string for the application.
-    Supply at deploy time only via environment variable:
+    Database connection string for the application.
+    For PostgreSQL:  postgresql://user:pass@host:5432/dbname
+    For SQLite demo: sqlite:////app/entitlesim.db  (ephemeral — data lost on restart)
+    Supply at deploy time via environment variable (never in a .tfvars file):
       export TF_VAR_database_url="postgresql://user:pass@host:5432/dbname"
-    NEVER set this in a .tfvars file or commit it to version control.
+    If unset, the application falls back to SQLite automatically (no persistence
+    across Container App revisions).
   EOT
+  type        = string
+  sensitive   = true
+  default     = "sqlite:////app/entitlesim.db"
+}
+
+# ---------------------------------------------------------------------------
+# Container Registry (ACR) credentials — sensitive
+# ---------------------------------------------------------------------------
+
+variable "acr_login_server" {
+  description = "Login server FQDN of the Azure Container Registry, e.g. myacr.azurecr.io."
+  type        = string
+}
+
+variable "acr_username" {
+  description = "Username (admin or service principal) for ACR authentication."
+  type        = string
+}
+
+variable "acr_password" {
+  description = "Password for ACR authentication. Supply via TF_VAR_acr_password — NEVER in .tfvars."
   type        = string
   sensitive   = true
 }

@@ -39,6 +39,11 @@ container_image = "FILL_IN_IMAGE_REFERENCE"
 # Example: "workloadlensprod2024a"
 storage_account_name = "FILL_IN_STORAGE_ACCOUNT_NAME"
 
+# Azure Container Registry (ACR) targeting for image pulling.
+# Password is sensitive and must be supplied via TF_VAR_acr_password (never here).
+acr_login_server = "FILL_IN_ACR_LOGIN_SERVER"
+acr_username     = "FILL_IN_ACR_USERNAME"
+
 # ---------------------------------------------------------------------------
 # OPTIONAL overrides (prod-appropriate sizing)
 # ---------------------------------------------------------------------------

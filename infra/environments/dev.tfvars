@@ -14,32 +14,32 @@
 # ---------------------------------------------------------------------------
 
 # Name of the existing Azure Resource Group (not created by Terraform).
-resource_group_name = "FILL_IN_YOUR_RESOURCE_GROUP_NAME"
+# Verified: az group show -n rg-uc05-demo -> Succeeded (southindia)
+resource_group_name = "rg-uc05-demo"
 
-# Azure region — must match the region of the resource group above.
-# Examples: "eastus", "westeurope", "australiaeast"
-# Note: 'location' is read from the data source; this variable is used for
-# tags and any future region-specific resources.
+# Short label attached to resource tags.
 environment_label = "dev"
 
 # Full resource ID of the existing Container Apps Environment.
-# Find it in: Azure Portal → Container Apps Environments → <env> → Properties → Resource ID
-# Or: az containerapp env show -n <env-name> -g <rg> --query id -o tsv
-container_app_environment_id = "FILL_IN_CONTAINER_APPS_ENVIRONMENT_RESOURCE_ID"
+# Verified: az containerapp env show -n uc05-env -g rg-uc05-demo --query id -o tsv
+container_app_environment_id = "/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.App/managedEnvironments/uc05-env"
 
 # Name for the Container App resource (must be unique within the environment).
-container_app_name = "FILL_IN_CONTAINER_APP_NAME"  # e.g. "workloadlens-api-dev"
+container_app_name = "workloadlens-api-dev"
 
 # Fully-qualified container image reference.
-# The image must be built and pushed to a registry BEFORE running deploy.sh.
-# Example: "myacr.azurecr.io/workloadlens:dev-latest"
-container_image = "FILL_IN_IMAGE_REFERENCE"
+# Updated after CI build+push to ACR (commit SHA tag set by ci.yml).
+# Set to the SHA-tagged image once the build-and-push job completes on main.
+container_image = "uc05registry7bef65da.azurecr.io/workloadlens:latest"
 
-# Storage Account name: 3–24 lowercase alphanumeric (no hyphens).
-# MUST ALREADY EXIST — this project does not create the Storage Account.
-# It is a shared dependency and must NOT be deleted by this project.
-# Example: "workloadlensdev2024a"
-storage_account_name = "FILL_IN_STORAGE_ACCOUNT_NAME"
+# Storage Account name — Verified: az storage account list -g rg-uc05-demo
+# Standard_LRS, centralindia, status=available. NEVER deleted by this module.
+storage_account_name = "uc05storef6ea8975"
+
+# Azure Container Registry (ACR) targeting for image pulling.
+# Password is sensitive and must be supplied via TF_VAR_acr_password (never here).
+acr_login_server = "uc05registry7bef65da.azurecr.io"
+acr_username     = "uc05registry7bef65da"
 
 # ---------------------------------------------------------------------------
 # OPTIONAL overrides (safe defaults for dev)

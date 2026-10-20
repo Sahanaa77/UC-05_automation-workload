@@ -1,0 +1,15 @@
+=== WorkloadLens Live Health Smoke Test ===
+Target: https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/health
+Timestamp: 2026-10-20T13:04:18Z
+
+HTTP/1.1 200 OK
+Content-Length: 33
+Content-Type: application/json
+Date: Tue, 20 Oct 2026 13:04:18 GMT
+Server: uvicorn
+Vary: Origin
+
+{"status":"ok","version":"0.1.0"}
+
+✔ PASS — https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/health returned HTTP 200
+Endpoint verified live on Azure Container Apps.

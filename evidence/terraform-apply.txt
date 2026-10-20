@@ -1,0 +1,120 @@
+﻿data.azurerm_resource_group.main: Reading...
+data.azurerm_resource_group.main: Read complete after 1s [id=/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo]
+data.azurerm_storage_account.data: Reading...
+data.azurerm_storage_account.data: Read complete after 1s [id=/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.Storage/storageAccounts/uc05storef6ea8975]
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # azurerm_container_app.api will be created
+  + resource "azurerm_container_app" "api" {
+      + container_app_environment_id  = "/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.App/managedEnvironments/uc05-env"
+      + custom_domain_verification_id = (sensitive value)
+      + id                            = (known after apply)
+      + latest_revision_fqdn          = (known after apply)
+      + latest_revision_name          = (known after apply)
+      + location                      = (known after apply)
+      + name                          = "workloadlens-api-dev"
+      + outbound_ip_addresses         = (known after apply)
+      + resource_group_name           = "rg-uc05-demo"
+      + revision_mode                 = "Single"
+      + tags                          = {
+          + "environment" = "dev"
+          + "managed_by"  = "terraform"
+          + "project"     = "workloadlens"
+        }
+
+      + ingress {
+          + allow_insecure_connections = false
+          + external_enabled           = true
+          + fqdn                       = (known after apply)
+          + target_port                = 8000
+          + transport                  = "http"
+
+          + traffic_weight {
+              + latest_revision = true
+              + percentage      = 100
+            }
+        }
+
+      + secret {
+          # (sensitive value - database-url)
+        }
+
+      + secret {
+          # (sensitive value - acr-password)
+        }
+
+      + template {
+          + max_replicas    = 1
+          + min_replicas    = 0
+          + revision_suffix = (known after apply)
+
+          + container {
+              + cpu               = 0.25
+              + ephemeral_storage = (known after apply)
+              + image             = "uc05registry7bef65da.azurecr.io/workloadlens:latest"
+              + memory            = "0.5Gi"
+              + name              = "workloadlens-api"
+
+              + env {
+                  + name  = "TEST_MODE"
+                  + value = "0"
+                }
+              + env {
+                  + name        = "DATABASE_URL"
+                  + secret_name = "database-url"
+                }
+
+              + liveness_probe {
+                  + failure_count_threshold          = 3
+                  + initial_delay                    = 15
+                  + interval_seconds                 = 30
+                  + path                             = "/health"
+                  + port                             = 8000
+                  + termination_grace_period_seconds = (known after apply)
+                  + timeout                          = 1
+                  + transport                        = "HTTP"
+                }
+            }
+        }
+    }
+
+  # azurerm_storage_container.data will be created
+  + resource "azurerm_storage_container" "data" {
+      + container_access_type             = "private"
+      + default_encryption_scope          = (known after apply)
+      + encryption_scope_override_enabled = true
+      + has_immutability_policy           = (known after apply)
+      + has_legal_hold                    = (known after apply)
+      + id                                = (known after apply)
+      + metadata                          = (known after apply)
+      + name                              = "workloadlens-data"
+      + resource_manager_id               = (known after apply)
+      + storage_account_name              = "uc05storef6ea8975"
+    }
+
+Plan: 2 to add, 0 to change, 0 to destroy.
+
+azurerm_storage_container.data: Creating...
+azurerm_container_app.api: Creating...
+azurerm_storage_container.data: Creation complete after 2s [id=https://uc05storef6ea8975.blob.core.windows.net/workloadlens-data]
+azurerm_container_app.api: Still creating... [00m10s elapsed]
+azurerm_container_app.api: Still creating... [00m20s elapsed]
+azurerm_container_app.api: Still creating... [00m30s elapsed]
+azurerm_container_app.api: Creation complete after 38s [id=/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.App/containerApps/workloadlens-api-dev]
+
+Apply complete! Resources: 2 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+blob_container_name = "workloadlens-data"
+container_app_fqdn = "workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io"
+container_app_id = "/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.App/containerApps/workloadlens-api-dev"
+container_app_name = "workloadlens-api-dev"
+resource_group_name = "rg-uc05-demo"
+storage_account_id = "/subscriptions/a9ed4be1-[REDACTED]/resourceGroups/rg-uc05-demo/providers/Microsoft.Storage/storageAccounts/uc05storef6ea8975"
+storage_account_name = "uc05storef6ea8975"

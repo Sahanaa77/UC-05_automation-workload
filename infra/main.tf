@@ -83,6 +83,7 @@ resource "azurerm_container_app" "api" {
   name                         = var.container_app_name
   resource_group_name          = data.azurerm_resource_group.main.name
   container_app_environment_id = var.container_app_environment_id
+  workload_profile_name        = "Consumption"
   revision_mode                = "Single"
 
   # DATABASE_URL is stored as a secret inside the Container App;
@@ -91,6 +92,19 @@ resource "azurerm_container_app" "api" {
   secret {
     name  = "database-url"
     value = var.database_url
+  }
+
+  # ACR password stored as a Container App secret for image pull.
+  secret {
+    name  = "acr-password"
+    value = var.acr_password
+  }
+
+  # Registry credentials for pulling the container image from ACR.
+  registry {
+    server               = var.acr_login_server
+    username             = var.acr_username
+    password_secret_name = "acr-password"
   }
 
   template {
@@ -144,5 +158,13 @@ resource "azurerm_container_app" "api" {
     project     = "workloadlens"
     environment = var.environment_label
     managed_by  = "terraform"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      template[0].http_scale_rule,
+      template[0].container[0].liveness_probe[0].transport,
+      ingress[0].traffic_weight,
+    ]
   }
 }
