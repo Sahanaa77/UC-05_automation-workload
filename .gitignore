@@ -32,6 +32,7 @@ backend/*.egg-info/
 .DS_Store
 Thumbs.db
 
+<<<<<<< HEAD
 # Terraform
 *.tfstate
 *.tfstate.*
@@ -50,3 +51,12 @@ backend/.blob_local/
 # Python egg-info
 *.egg-info/
 
+=======
+# Terraform — never commit state or provider cache.
+# Local state files contain sensitive values (e.g. DATABASE_URL) in plaintext.
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/.terraform/
+infra/tfplan-*
+infra/.terraform.lock.hcl
+>>>>>>> dcf2a3258c585e3edc65fcfeb6627a460e394364
