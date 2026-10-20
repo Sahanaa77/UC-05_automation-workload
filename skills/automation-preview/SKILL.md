@@ -47,10 +47,14 @@ container_image              = "myacr.azurecr.io/workloadlens:dev-abc1234"
 storage_account_name         = "workloadlensdev2024a"
 ```
 
-Do **not** add `database_url` here. Set it as an environment variable:
+Do **not** add `database_url` or `acr_password` here. Set them as environment variables:
 
 ```bash
+# Database URL (Postgres or SQLite default):
 export TF_VAR_database_url="postgresql://user:pass@host:5432/workloadlens"
+
+# ACR pull password (retrieved from Azure CLI):
+export TF_VAR_acr_password=$(az acr credential show --name <acr_name> --query "passwords[0].value" -o tsv)
 ```
 
 ---

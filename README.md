@@ -85,15 +85,21 @@ cd frontend && npm run build
 
 Infrastructure for Azure is in `infra/`. See [`docs/deployment-runbook.md`](docs/deployment-runbook.md) for the full guide.
 
+**Live Deployed Verification:**
+- **Container App Endpoint:** `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/health`
+- **Region:** `centralindia`
+- **Status:** Healthy (`HTTP 200 OK`, `{"status":"ok","version":"0.1.0"}`)
+
 **Quick path:**
 
 ```bash
 # 1. Fill in all FILL_IN_* values in the parameter file for your environment.
-#    Never add database_url to this file.
+#    Never add database_url or secrets to this file.
 nano infra/environments/dev.tfvars
 
-# 2. Export the database connection string as an environment variable only.
-export TF_VAR_database_url="postgresql://user:pass@host:5432/entitlesim"
+# 2. Export runtime secrets via environment variables only.
+export TF_VAR_database_url="postgresql://user:pass@host:5432/entitlesim"  # or use SQLite default
+export TF_VAR_acr_password=$(az acr credential show --name <acr> --query "passwords[0].value" -o tsv)
 
 # 3. Deploy (runs preflight checks, plan, apply, and smoke test).
 ENV=dev ./scripts/deploy.sh

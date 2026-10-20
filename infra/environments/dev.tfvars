@@ -36,6 +36,11 @@ container_image = "uc05registry7bef65da.azurecr.io/workloadlens:latest"
 # Standard_LRS, centralindia, status=available. NEVER deleted by this module.
 storage_account_name = "uc05storef6ea8975"
 
+# Azure Container Registry (ACR) targeting for image pulling.
+# Password is sensitive and must be supplied via TF_VAR_acr_password (never here).
+acr_login_server = "uc05registry7bef65da.azurecr.io"
+acr_username     = "uc05registry7bef65da"
+
 # ---------------------------------------------------------------------------
 # OPTIONAL overrides (safe defaults for dev)
 # ---------------------------------------------------------------------------

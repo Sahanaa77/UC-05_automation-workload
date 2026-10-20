@@ -64,10 +64,15 @@ curl -s "https://${FQDN}/health" | tee evidence/health-response.json
 
 ## Status
 
-| Artifact | Status |
-|---|---|
-| `terraform-plan.txt` | ⏳ Pending — run after filling `dev.tfvars` |
-| `terraform-apply.txt` | ⏳ Pending — captured during first deploy |
-| `verify-curl.txt` | ⏳ Pending — run after deploy |
-| `health-response.json` | ⏳ Pending — run after deploy |
-| `azure-portal-screenshot.png` | ⏳ Pending — manual capture |
+| Artifact | Status | Details |
+|---|---|---|
+| `terraform-plan.txt` | ✅ Verified | Plan: 2 to add, 0 to change, 0 to destroy |
+| `terraform-apply.txt` | ✅ Verified | Apply complete! 2 added, 0 changed, 0 destroyed |
+| `verify-curl.txt` | ✅ Verified | HTTP/1.1 200 OK from live Azure Container App |
+| `health-response.json` | ✅ Verified | `{"status":"ok","version":"0.1.0"}` |
+| `azure-portal-screenshot.png` | ⏳ Optional | Manual portal capture if desired |
+
+### Live Deployed Endpoint
+- **URL:** `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/health`
+- **Region:** `centralindia` (Environment: `uc05-env`, RG: `rg-uc05-demo`)
+- **Status:** Healthy (HTTP 200)

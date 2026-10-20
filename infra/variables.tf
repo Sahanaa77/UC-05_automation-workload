@@ -73,6 +73,26 @@ variable "database_url" {
 }
 
 # ---------------------------------------------------------------------------
+# Container Registry (ACR) credentials — sensitive
+# ---------------------------------------------------------------------------
+
+variable "acr_login_server" {
+  description = "Login server FQDN of the Azure Container Registry, e.g. myacr.azurecr.io."
+  type        = string
+}
+
+variable "acr_username" {
+  description = "Username (admin or service principal) for ACR authentication."
+  type        = string
+}
+
+variable "acr_password" {
+  description = "Password for ACR authentication. Supply via TF_VAR_acr_password — NEVER in .tfvars."
+  type        = string
+  sensitive   = true
+}
+
+# ---------------------------------------------------------------------------
 # Storage
 # ---------------------------------------------------------------------------
 

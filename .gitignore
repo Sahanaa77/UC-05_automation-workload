@@ -37,5 +37,7 @@ Thumbs.db
 infra/terraform.tfstate
 infra/terraform.tfstate.backup
 infra/.terraform/
-infra/tfplan-*
+infra/tfplan*
+infra/*.tfplan
+infra/.terraform.tfstate.lock.info
 infra/.terraform.lock.hcl
