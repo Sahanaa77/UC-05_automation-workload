@@ -119,3 +119,74 @@ export interface StepInfo {
   title: string
   path: string
 }
+
+// ============================================================================
+// UC-05 Automation Workload Preview SaaS Types
+// ============================================================================
+
+export interface UC05JobRecord {
+  record_id: string
+  tool: 'EXPORT' | 'VALIDATE' | string
+  record_count: number
+  environment: 'TEST' | 'STAGE' | string
+}
+
+export interface UC05ValidationIssue {
+  row_index: number
+  field: string
+  rule_id: 'R1' | 'R2' | 'R3' | 'R4' | string
+}
+
+export interface UC05ValidateResult {
+  valid_rows: number
+  invalid_rows: number
+  issues: UC05ValidationIssue[]
+}
+
+export interface UC05ProcessSummary {
+  input_rows: number
+  total_records: number
+  total_estimated_ms: number
+}
+
+export interface UC05ProcessRow {
+  record_id: string
+  estimated_ms: number
+}
+
+export interface UC05ProcessResult {
+  summary: UC05ProcessSummary
+  rows: UC05ProcessRow[]
+  issues: UC05ValidationIssue[]
+}
+
+export interface UC05WorkloadRun {
+  run_id: string
+  status: 'Running' | 'Succeeded' | 'Failed' | string
+  operation: 'validate' | 'process'
+  result?: UC05ValidateResult | UC05ProcessResult | any
+  error?: string | null
+  created_at?: string
+  http_status?: number
+}
+
+export interface UC05Subscription {
+  tenant_id: string
+  plan: 'Basic' | 'Pro'
+  status: 'Active' | 'Suspended'
+  daily_quota: number
+  used_today: number
+  remaining_quota: number
+  daily_limit?: number
+  remaining?: number
+}
+
+export interface UC05MockIdentity {
+  token: string
+  label: string
+  tenantId: string
+  role: 'Operator' | 'Viewer'
+  plan: 'Basic' | 'Pro'
+  status: 'Active' | 'Suspended'
+}
+
