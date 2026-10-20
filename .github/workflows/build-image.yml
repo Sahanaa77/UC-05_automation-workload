@@ -18,12 +18,17 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
+      - name: Verify Dockerfile
+        run: |
+          pwd
+          ls -la
+          ls -la backend
+          test -f backend/Dockerfile
 
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile
           push: true
           tags: uc05registry7bef65da.azurecr.io/uc05-backend:v1
-
