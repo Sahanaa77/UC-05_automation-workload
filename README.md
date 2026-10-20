@@ -1,27 +1,111 @@
-# WorkloadLens
+# EntitleSim
 
 > Model-Based Verification & Counterexample Engine for SaaS Entitlement Workflows
 
-WorkloadLens systematically explores bounded event sequences (reordered/duplicated webhooks, concurrent ops, interrupted handlers), checks developer-defined entitlement and tenant-isolation invariants, minimizes failing traces into counterexamples, lets the dev validate a fix, and exports a regression test for CI/CD.
+EntitleSim is a developer workbench that systematically explores bounded event sequences (reordered webhooks, duplicated events, concurrent operations, and interrupted handlers), checks developer-defined entitlement and tenant-isolation invariants, minimizes failing traces into counterexamples using delta debugging, validates fixes, and exports reproducible regression tests for CI/CD.
 
-## Differentiators
+---
 
-Systematic event exploration · Counterexample minimization · Entitlement-specific invariants as first-class rules · Regression test generation. (We do NOT claim to invent model checking or generic chaos testing.)
+## Architecture Diagram
 
-## 6-Step Verification Workflow
+The diagram below illustrates EntitleSim's logical verification pipeline, from model definition and in-memory exploration to counterexample minimization and deployment infrastructure.
 
-1. **Model & Define**: Define plans, features, invariants, and initial scenario sequences.
-2. **Bounded Exploration**: Systematically permute event arrivals, simulate duplicate webhooks, and record states explored & invariant violations in real-time.
-3. **Violation & Minimization**: Run `ddmin` delta debugging to strip non-essential events down to a 4-step canonical failure.
-4. **Inspect State Diff**: Interactive trace playback, state-machine graph with offending transitions highlighted in red, and side-by-side Expected vs Observed state diffs.
-5. **Fix & Retest**: Validate bug fixes (`fixed=true`), verify counterexample passes, and execute full re-verification pass (0 violations).
-6. **Regression Export**: Export self-contained `pytest` tests and ready-to-run GitHub Actions CI suite.
+```mermaid
+flowchart TD
+    %% ------------------------------------------------------------------------
+    %% EntitleSim: Monochrome Architecture Diagram
+    %% ------------------------------------------------------------------------
+
+    subgraph INPUT ["1. Verification Input"]
+        M_DEF["SaaS Model Definition: Tenants, Plans, Roles, Invariants"]
+        M_BOUNDS["Exploration Bounds: Depth, Retries, Concurrency, Seed"]
+        M_EVENTS["Initial Event Sequences: Subscription, Usage, Invoices"]
+    end
+
+    subgraph ENGINE ["2. Core Verification Engine (In-Memory)"]
+        EXPLORER["Bounded Event Explorer: Permutations, Duplicates, Reordering"]
+        ORACLE["Reference Oracle: Expected State Computation"]
+        SUT["System Under Test: Handlers and Bug Flags"]
+        INV_CHECK["Invariant Checker: Entitlements, Quotas, Tenant Isolation"]
+    end
+
+    subgraph DEBUGGING ["3. Results & Minimization"]
+        VIOLATIONS["Invariant Violations Detected: Failing Event Traces"]
+        MINIMIZER["Trace Minimizer: ddmin Delta Debugging Algorithm"]
+        DIFF["State Diff Inspector: Expected vs Observed Transitions"]
+        RETEST["Fix Validation: Re-Verification with fixed=True"]
+        EXPORT["Regression Exporter: Generated pytest Files & CI Suite"]
+    end
+
+    subgraph APP ["4. Application & Persistence Layer"]
+        UI["Frontend Dashboard: React 19, Stepper, State Machine Graph"]
+        API["Backend REST API: FastAPI, Models, Runs, Counterexamples"]
+        DB[("Database Storage: SQLite default or PostgreSQL JSONB")]
+    end
+
+    subgraph INFRA ["5. Build & Hosting Infrastructure"]
+        GHA["GitHub Actions CI: Tests, Frontend Build, Container Image Build"]
+        ACR["Azure Container Registry: uc05registry7bef65da.azurecr.io"]
+        ACA["Azure Container App: workloadlens-api-dev on Port 8000"]
+        BLOB["Azure Blob Storage: workloadlens-data (Private Container)"]
+    end
+
+    %% Verification Engine Flow
+    INPUT --> EXPLORER
+    EXPLORER --> ORACLE
+    EXPLORER --> SUT
+    ORACLE --> INV_CHECK
+    SUT --> INV_CHECK
+
+    %% Debugging and Minimization Flow
+    INV_CHECK -->|Violations Found| VIOLATIONS
+    VIOLATIONS --> MINIMIZER
+    MINIMIZER --> DIFF
+    DIFF --> RETEST
+    RETEST --> EXPORT
+
+    %% Application Layer Connections
+    UI <-->|HTTP REST / Progress Polling| API
+    API <-->|Durable Persistence| DB
+    API <-->|In-Memory Execution| ENGINE
+    API -.->|Fetch Counterexamples & Traces| DEBUGGING
+
+    %% Build and Cloud Infrastructure Connections
+    API -.->|Packaged via Dockerfile| GHA
+    GHA -->|Build & Push Docker Image| ACR
+    ACR -->|Container Image Pull on Deploy| ACA
+    ACA -.->|Infrastructure Pre-requisite| BLOB
+
+    %% Styling: Black outlines, white fill, black text
+    classDef default fill:#ffffff,stroke:#000000,stroke-width:1.5px,color:#000000;
+    classDef storage fill:#fcfcfc,stroke:#000000,stroke-width:1.5px,stroke-dasharray: 4 2,color:#000000;
+    class DB,BLOB storage;
+```
+
+> **Note on Infrastructure Separation:**
+> - **Verification Data Flow:** All verification states, runs, counterexamples, and regression exports are evaluated in-memory and persisted durably in the application database (SQLite default or PostgreSQL with JSONB).
+> - **Azure Blob Storage (`workloadlens-data`):** Managed as an isolated cloud infrastructure dependency via Terraform; application verification results are stored in the database, not in Blob Storage.
+> - **CI/CD Automation:** GitHub Actions runs backend tests, frontend builds, Terraform validation, and builds/pushes container images to Azure Container Registry (ACR). It does not automatically deploy; cloud deployments are operator-controlled via Terraform.
+
+---
+
+## Verification Pipeline
+
+EntitleSim executes a five-stage verification lifecycle:
+
+1. **Model & Bounds Ingestion**: Developers supply a declarative model containing tenant IDs, subscription tiers (`free`, `pro`), feature flags, role permissions, and formal invariants (`INV-1` feature access, `INV-2` usage quotas, `INV-3` cross-tenant isolation). Exploration bounds define maximum search depth, retry thresholds, concurrency interleavings, and random seed.
+2. **Systematic State Exploration**: The in-memory Bounded Event Explorer systematically permutes event arrival orderings and injects duplicate webhooks. Each sequence is dispatched in parallel to both the Reference Oracle (calculating true expected state) and the System Under Test (SUT) with configurable bug toggles.
+3. **Invariant Checking**: Invariants are evaluated across all tenants after each state transition. Any mismatch between expected and observed state triggers an invariant violation report with its complete trace.
+4. **Counterexample Minimization (`ddmin`)**: Raw counterexample traces often contain non-essential noise events. The trace minimizer applies the Delta Debugging (`ddmin`) algorithm to discard irrelevant steps while preserving the failure, isolating canonical failure sequences (e.g., 4 steps for out-of-order plan upgrade/downgrade races).
+5. **Fix Validation & Regression Export**: Developers validate fixes (`fixed=true`) through a re-verification pass ensuring zero invariant violations. EntitleSim exports standalone `pytest` test files and CI workflow definitions to prevent regressions.
 
 ---
 
 ## Quickstart
 
-Run without Docker (defaults to SQLite file database at `backend/entitlesim.db`):
+### Local Development (without Docker)
+
+EntitleSim defaults to an embedded SQLite file database at `backend/entitlesim.db`:
 
 ```bash
 task dev
@@ -29,24 +113,22 @@ task dev
 
 This starts:
 - **Web Dashboard**: [http://localhost:5173](http://localhost:5173)
-- **API & Swagger Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **API & Interactive Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
 
-### Running the 1-Click Demo
+### Running the 1-Click Interactive Demo
 
-Once `task dev` is running, open [http://localhost:5173](http://localhost:5173) in your browser and click **Run Demo** in the top navigation bar. WorkloadLens will automatically walk through steps 1 to 6 end-to-end:
-1. Loads the SaaS subscription model (2 tenants, 5 invariants).
-2. Explores bounded state space and captures the `INV-1` unauthorized premium access violation.
-3. Minimizes the failing trace to the canonical 4-step sequence.
-4. Highlights the out-of-order transition on the interactive state machine graph.
-5. Applies the fix (`fixed=true`) and re-verifies 0 violations.
-6. Displays the generated regression test and CI workflow.
+Once `task dev` is running, open [http://localhost:5173](http://localhost:5173) in your browser and click **Run Demo** in the top navigation bar. EntitleSim will execute the 6-step workflow automatically:
+1. **Model & Define**: Loads the sample SaaS model (2 tenants, feature tiers, 5 invariants).
+2. **Bounded Exploration**: Permutes event orderings, captures states explored, and flags `INV-1` unauthorized access.
+3. **Violation & Minimization**: Minimizes the trace to the canonical 4-step counterexample using `ddmin`.
+4. **Inspect State Diff**: Highlights the offending transition on the state machine graph with side-by-side diffs.
+5. **Fix & Retest**: Enables the fix (`fixed=true`) and runs a re-verification pass (0 violations).
+6. **Regression Export**: Displays the generated self-contained `pytest` regression suite and CI configuration.
 
----
+### Optional: Docker Compose (PostgreSQL)
 
-### Optional: Docker Compose
-
-If Docker and Docker Compose are available on your host, you can optionally run with PostgreSQL:
+If Docker is available, EntitleSim can run with PostgreSQL:
 
 ```bash
 task up
@@ -59,10 +141,10 @@ docker compose up --build
 ## Verification & Testing
 
 ```bash
-# Run backend engine and API test suite (17 passed)
+# Run backend engine and API test suite (21 passed)
 task test
 
-# Seed the default SaaS model into the database
+# Seed the default SaaS models into the database
 task seed
 
 # Build frontend production bundle
@@ -71,55 +153,44 @@ cd frontend && npm run build
 
 ---
 
-## Boundaries & Constraints
+## Boundaries & Limitations
 
-- **Model accuracy**: Verifies the developer-defined state model / instrumented adapter, not uninstrumented source code.
-- **Bounded exploration**: Strictly bounded by configurable step limits (depth, retries, concurrency, state caps).
-- **Sandbox only**: No real payment-provider or Stripe transactions; all events simulated locally.
-
-> *"From a flaky production bug to a permanent regression test in one workflow."*
+- **Model-Based Verification**: EntitleSim verifies the developer-defined state model or instrumented adapter, not arbitrary uninstrumented source code.
+- **Bounded Exploration**: State exploration is finite and strictly bounded by user-configured depth, retry, and concurrency limits to guarantee termination.
+- **Sandbox Environment**: All webhook and billing events are simulated locally; no live Stripe or external payment gateway transactions are performed.
 
 ---
 
-## Azure Deployment
+## Cloud Deployment & Live Verification
 
-Infrastructure for Azure is in `infra/`. See [`docs/deployment-runbook.md`](docs/deployment-runbook.md) for the full guide.
+Infrastructure as Code is managed under [`infra/`](infra/). For complete instructions, see the [`Deployment Runbook`](docs/deployment-runbook.md).
 
 **Live Deployed Verification:**
 - **Container App Endpoint:** `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/health`
-- **Region:** `centralindia`
+- **Region:** `centralindia` (Resource Group: `rg-uc05-demo`, Environment: `uc05-env`)
 - **Status:** Healthy (`HTTP 200 OK`, `{"status":"ok","version":"0.1.0"}`)
 
-**Quick path:**
+### Quick Deployment Path
 
 ```bash
-# 1. Fill in all FILL_IN_* values in the parameter file for your environment.
-#    Never add database_url or secrets to this file.
+# 1. Populate dev parameter file (do not commit secrets)
 nano infra/environments/dev.tfvars
 
-# 2. Export runtime secrets via environment variables only.
+# 2. Export runtime secrets via environment variables
 export TF_VAR_database_url="postgresql://user:pass@host:5432/entitlesim"  # or use SQLite default
 export TF_VAR_acr_password=$(az acr credential show --name <acr> --query "passwords[0].value" -o tsv)
 
-# 3. Deploy (runs preflight checks, plan, apply, and smoke test).
+# 3. Deploy via helper script (runs preflight, plan, apply, and smoke test)
 ENV=dev ./scripts/deploy.sh
 
-# 4. Verify independently at any time.
+# 4. Verify independently
 FQDN=$(terraform -chdir=infra output -raw container_app_fqdn)
 ./scripts/verify.sh "${FQDN}"
 ```
 
-**Terraform scope** — this module creates exactly two resources:
-- Azure Container App (WorkloadLens API, port 8000, `GET /health`)
-- Private Blob container inside a pre-existing Storage Account
-
-The Resource Group, Container Apps Environment, and Storage Account are pre-existing shared dependencies; they are referenced, not created or deleted.
-
-For cleanup instructions, see [`docs/deployment-runbook.md §8`](docs/deployment-runbook.md#8-cleanup-guarded).
-
 ### Deployment & CI Evidence
 
-Verified live deployment and CI artifacts are cataloged in [`evidence/README.md`](evidence/README.md):
+Verified deployment and CI artifacts are cataloged in [`evidence/README.md`](evidence/README.md):
 - **Health Response**: [`evidence/health-response.json`](evidence/health-response.json) (HTTP 200 OK)
 - **Live Headers**: [`evidence/verify-curl.txt`](evidence/verify-curl.txt) (Uvicorn server response)
 - **Pre-Deploy Plan**: [`evidence/terraform-plan.txt`](evidence/terraform-plan.txt) (2 to add)
