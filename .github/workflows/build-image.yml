@@ -18,9 +18,12 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
+
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
+          file: ./backend/Dockerfile
           push: true
-          tags: ${{ secrets.ACR_LOGIN_SERVER }}/uc05-backend:v1
+          tags: uc05registry7bef65da.azurecr.io/uc05-backend:v1
+
