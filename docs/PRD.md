@@ -1,5 +1,5 @@
-# EntitleSim — PRD
-**Title:** EntitleSim: Model-Based Verification & Counterexample Engine for SaaS Entitlement Workflows
+# WorkloadLens — PRD
+**Title:** WorkloadLens: Model-Based Verification & Counterexample Engine for SaaS Entitlement Workflows
 **Track:** SaaS – Entitlements and usage workflow
 
 ## One-liner

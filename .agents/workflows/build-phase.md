@@ -1,5 +1,5 @@
 # build-phase
-Build exactly one phase of EntitleSim from the spec docs.
+Build exactly one phase of WorkloadLens from the spec docs.
 
 ## Steps
 1. Read AGENTS.md and docs/BUILD_PLAN.md. Identify the phase number from my message (default: first unchecked phase).

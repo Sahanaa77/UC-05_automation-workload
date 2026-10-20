@@ -1,4 +1,4 @@
-# EntitleSim — Agent Rules
+# WorkloadLens — Agent Rules
 Hackathon prototype: model-based verification + counterexample engine for SaaS entitlement workflows.
 Source of truth = /docs. Read, don't re-derive.
 
