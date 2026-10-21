@@ -220,22 +220,23 @@ procedure. Follow it only after manually confirming resource ownership via tags.
 
 ### Manual procedure (state unavailable)
 
-> **WARNING**: Delete only the Container App and Blob container.
-> The Storage Account is a pre-existing shared dependency and must **never** be deleted by this procedure.
+> **WARNING**: Delete ONLY the Container App and Blob container.
+> The Storage Account is a pre-existing shared dependency and must **NEVER** be deleted.
+> Never execute `az storage account delete` or `az group delete`.
 
 ```bash
-# List candidates:
+# 1. List candidates for deletion:
 az containerapp list -g <rg> --query '[].{name:name, tags:tags}' -o table
-az storage account list -g <rg> --query '[].{name:name, tags:tags}' -o table
+az storage container list --account-name <storage-account-name> --auth-mode login --query '[].name' -o table
 
-# Confirm tags (managed_by=terraform, project=workloadlens) before deleting:
+# 2. Confirm Container App ownership (managed_by=terraform, project=workloadlens) before deleting:
 az containerapp show -n <name> -g <rg> --query tags -o json
-az storage account show -n <storage-account-name> -g <rg> --query tags -o json
 
-# Delete only the Container App and Blob container after confirming ownership.
-# Do NOT delete the Storage Account, Resource Group, or Container Apps Environment.
+# 3. Delete ONLY the Container App and Blob container after confirming ownership:
 az containerapp delete -n <container-app-name> -g <rg> --yes
 az storage container delete --name <blob-container-name> --account-name <storage-account-name> --auth-mode login
+
+# DO NOT delete the Storage Account, Resource Group, Container Apps Environment, or Database.
 ```
 
 ---
@@ -263,7 +264,7 @@ When the team agrees on a shared backend:
 | `.env` files are gitignored | Confirmed in repo `.gitignore` |
 | Storage Account is private (existing) | Pre-existing; confirm `public_network_access_enabled = false` on the SA before use |
 | Blob container is private | `container_access_type = "private"` in `main.tf` |
-| TLS 1.2+ on Storage Account | This module does not manage the existing Storage Account. Operators must independently verify that `min_tls_version = TLS1_2` is configured on the pre-existing SA before use. |
+| TLS 1.2+ on Storage Account | This Terraform module does not configure or manage the pre-existing Storage Account. Operators must independently verify that `min_tls_version = TLS1_2` is configured on the pre-existing Storage Account prior to use; this module does NOT enforce or mutate it. |
 | Container App secrets | `DATABASE_URL` stored as a Container App secret, not a plain env var |
 | Cleanup requires typed confirmation | `cleanup.sh` validates resource IDs before any `az delete` call |
 | Terraform state contains secrets | If remote state is used, restrict access to the state container |
