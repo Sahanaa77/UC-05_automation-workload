@@ -343,25 +343,47 @@ For complete citations, conceptual summaries, verified application mappings, and
 
 ---
 
-## 14. Team and Contributions
+## 14. Team Code Sapiens
+
+*WorkloadLens — UC-05 Automation Workload Preview SaaS*
 
 WorkloadLens was engineered, tested, verified, and deployed by **Team Code Sapiens** for the **UC-05 Automation Workload Preview SaaS** challenge (Cloud & SaaS Engineering Challenges, Revision 2).
 
-### Poojhaa K — Team Lead
-* **Leadership & Project Coordination:** Served as Team Lead, overseeing project milestones, task distribution, delivery schedules, and team synchronization across all phases of work.
-* **Requirements & Compliance Oversight:** Directed team alignment with the official UC-05 specification and acceptance criteria (A01–A12), ensuring complete coverage of validation rules, tenant isolation models, and quota requirements.
-* **Intended Peer Verifier (A12):** Designated peer verifier for acceptance check A12 fresh-session independent replay (handle provided: `Govindharaju_1951`, pending profile URL verification).
+### Team and Contributions
 
-### Rohita — Documentation, Testing, and Deployment
-* **Documentation:** Authored and enhanced comprehensive project documentation, including high-level architecture designs, sequence workflows, data models, operational runbooks, and repository guides.
-* **Testing and Verification:** Contributed to validating application behavior against specifications, implementing and executing backend test suites (63 tests), verifying concurrency race condition protections, and auditing the A01–A12 compliance evidence matrix.
-* **Deployment:** Contributed to cloud deployment activities on Microsoft Azure, configuring multi-stage container workflows, verifying container registry publication, validating live API and web endpoints, and coordinating post-deployment sanity checks.
+#### **Poojhaa K**
+*Team Lead & Technical Coordination*  
+Directs overall project delivery, milestone governance, team synchronization, and architectural alignment with UC-05 specifications.
+* **Project Governance & Delivery:** Coordinates milestones, task delegation, review cadences, and cross-functional synchronization between engineering, quality assurance, and deployment streams.
+* **Specification & Architecture Alignment:** Oversees compliance with UC-05 challenge standards, including R1–R4 batch validation constraints, tenant isolation boundaries, and daily quota limits.
+* **Quality & Integration Review:** Coordinates delivery reviews and serves as designated peer verifier for acceptance check A12 independent fresh-session replay (*pending independent execution*).
+* **GitHub:** Confirmation pending (*supplied handle `Govindharaju_1951` returned HTTP 404; pending team confirmation*).
 
-### Sahanaa — Team Member and Repository Owner
-* **Repository Management:** Served as repository owner, establishing the project structure, governing branch policies, conducting pull request reviews, and integrating code across branches.
-* **Full-Stack Implementation:** Contributed to application implementation across frontend and backend services, including simulation logic, UI component structuring, and baseline UC-05 feature capabilities.
+---
 
-### Team Code Sapiens Acknowledgement
+#### **Rohita M**
+*Documentation, QA & Deployment Lead*  
+Leads technical architecture documentation, automated test suite engineering, cloud CI/CD pipeline automation, and Azure release verification.
+* **Technical Documentation:** Prepared and refined comprehensive architecture explanations ([`high-level-architecture.md`](docs/architecture/high-level-architecture.md), [`sequence-diagrams.md`](docs/architecture/sequence-diagrams.md), [`data-model.md`](docs/architecture/data-model.md), [`references.md`](docs/architecture/references.md)), operational runbooks ([`RUNBOOK.md`](docs/RUNBOOK.md)), and repository guides.
+* **Testing and Quality Assurance:** Contributed to testing and verification, expanding test suites (63 passing tests across unit, boundary, concurrency race condition guards, and failure hooks), and auditing A01–A11 acceptance compliance.
+* **Deployment and Release Verification:** Developed automated multi-stage container workflows (`.github/workflows/ci.yml`, `build-image.yml`), verified Azure Container Registry publication, performed live cloud smoke tests, and refined the Contemporary Heritage interface.
+* **Acceptance Evidence:** Documented project verification and structured evidence used to demonstrate compliance with UC-05 requirements ([`acceptance-matrix.md`](docs/architecture/acceptance-matrix.md), [`evidence/ACCEPTANCE_EVIDENCE.md`](evidence/ACCEPTANCE_EVIDENCE.md)).
+* **GitHub:** Confirmation pending (*profile URL to be confirmed by team member; git author `rohitam256@gmail.com`*).
+
+---
+
+#### **Sahana Shree VS**
+*Software Engineering & Application Development*  
+Leads core application development, implementing full-stack business logic, validation rules, relational data persistence, and interactive frontend interfaces.
+* **Backend Architecture & APIs:** Implemented core FastAPI services, JWT authentication middleware, tenant-isolated request routing, database schema models (`Runs`, `DailyUsage`, `Subscriptions`), and Azure Blob Storage persistence.
+* **Business Logic & Validation:** Engineered pure-function R1–R4 batch validation rules, deterministic Pro processing effort estimation (10 ms/record), and atomic conditional SQL quota reservation mechanisms.
+* **Frontend Implementation:** Built the single-page application interface in React 19, TypeScript, and Vite, including the interactive workload builder ([`RunTools.tsx`](frontend/src/pages/RunTools.tsx)) and audit history view ([`WorkloadHistory.tsx`](frontend/src/pages/WorkloadHistory.tsx)).
+* **Repository & Integration Management:** Managed canonical repository setup, branching workflows (`main`, `uc05-build`), code reviews, and pull request integrations (PRs #1–#7).
+* **GitHub:** [Sahanaa77](https://github.com/Sahanaa77) *(verified profile)*
+
+---
+
+### Collaborative Acknowledgement
 Team Code Sapiens collaboratively developed WorkloadLens to demonstrate production-grade cloud SaaS engineering, resilient multitenancy, robust concurrency controls, and high-fidelity user experience for automated workload validation.
 
 ---

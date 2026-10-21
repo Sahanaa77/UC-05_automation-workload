@@ -28,7 +28,7 @@
 
 ### A12 Peer Verification Protocol
 
-* **Designated Peer Verifier:** Poojhaa K (Team Lead, handle provided: `Govindharaju_1951`).
+* **Designated Peer Verifier:** Poojhaa K (Team Lead & Technical Coordination, handle provided: `Govindharaju_1951`, pending profile URL verification).
 * **Environment Requirement:** A fresh, independent shell session or clean workstation clone.
 * **Credential Policy:** No personal account credentials, passwords, or private tokens are required or permitted to be logged. Replay operations utilize standard test fixture identity tokens (`token-tenant-a-operator`) as specified in the operational guide.
 * **Procedure Scope:**
