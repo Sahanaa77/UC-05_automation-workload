@@ -343,48 +343,13 @@ For complete citations, conceptual summaries, verified application mappings, and
 
 ---
 
-## 14. Team Code Sapiens
+## 14. Team Members and Contributions
 
-*WorkloadLens — UC-05 Automation Workload Preview SaaS*
-
-WorkloadLens was engineered, tested, verified, and deployed by **Team Code Sapiens** for the **UC-05 Automation Workload Preview SaaS** challenge (Cloud & SaaS Engineering Challenges, Revision 2).
-
-### Team and Contributions
-
-#### **[Poojhaa K](https://github.com/Poojhaakarthikeyan)**
-*Team Lead & Technical Coordination*  
-Directs overall project delivery, milestone governance, team synchronization, and architectural alignment with UC-05 specifications.
-* **Project Governance & Delivery:** Coordinates milestones, task delegation, review cadences, and cross-functional synchronization between engineering, quality assurance, and deployment streams.
-* **Specification & Architecture Alignment:** Oversees compliance with UC-05 challenge standards, including R1–R4 batch validation constraints, tenant isolation boundaries, and daily quota limits.
-* **Quality & Integration Review:** Coordinates delivery reviews and serves as designated peer verifier for acceptance check A12 independent fresh-session replay (*pending independent execution*).
-* **GitHub:** [@Poojhaakarthikeyan](https://github.com/Poojhaakarthikeyan) *(verified profile)*
-
----
-
-#### **Rohita M**
-*Documentation, QA & Deployment Lead*  
-Leads technical architecture documentation, automated test suite engineering, cloud CI/CD pipeline automation, and Azure release verification.
-* **Technical Documentation:** Prepared and refined comprehensive architecture explanations ([`high-level-architecture.md`](docs/architecture/high-level-architecture.md), [`sequence-diagrams.md`](docs/architecture/sequence-diagrams.md), [`data-model.md`](docs/architecture/data-model.md), [`references.md`](docs/architecture/references.md)), operational runbooks ([`RUNBOOK.md`](docs/RUNBOOK.md)), and repository guides.
-* **Testing and Quality Assurance:** Contributed to testing and verification, expanding test suites (63 passing tests across unit, boundary, concurrency race condition guards, and failure hooks), and auditing A01–A11 acceptance compliance.
-* **Deployment and Release Verification:** Developed automated multi-stage container workflows (`.github/workflows/ci.yml`, `build-image.yml`), verified Azure Container Registry publication, performed live cloud smoke tests, and refined the Contemporary Heritage interface.
-* **Acceptance Evidence:** Documented project verification and structured evidence used to demonstrate compliance with UC-05 requirements ([`acceptance-matrix.md`](docs/architecture/acceptance-matrix.md), [`evidence/ACCEPTANCE_EVIDENCE.md`](evidence/ACCEPTANCE_EVIDENCE.md)).
-* **GitHub:** Confirmation pending (*profile URL to be confirmed by team member; git author `rohitam256@gmail.com`*).
-
----
-
-#### **Sahana Shree VS**
-*Software Engineering & Application Development*  
-Leads core application development, implementing full-stack business logic, validation rules, relational data persistence, and interactive frontend interfaces.
-* **Backend Architecture & APIs:** Implemented core FastAPI services, JWT authentication middleware, tenant-isolated request routing, database schema models (`Runs`, `DailyUsage`, `Subscriptions`), and Azure Blob Storage persistence.
-* **Business Logic & Validation:** Engineered pure-function R1–R4 batch validation rules, deterministic Pro processing effort estimation (10 ms/record), and atomic conditional SQL quota reservation mechanisms.
-* **Frontend Implementation:** Built the single-page application interface in React 19, TypeScript, and Vite, including the interactive workload builder ([`RunTools.tsx`](frontend/src/pages/RunTools.tsx)) and audit history view ([`WorkloadHistory.tsx`](frontend/src/pages/WorkloadHistory.tsx)).
-* **Repository & Integration Management:** Managed canonical repository setup, branching workflows (`main`, `uc05-build`), code reviews, and pull request integrations (PRs #1–#7).
-* **GitHub:** [Sahanaa77](https://github.com/Sahanaa77) *(verified profile)*
-
----
-
-### Collaborative Acknowledgement
-Team Code Sapiens collaboratively developed WorkloadLens to demonstrate production-grade cloud SaaS engineering, resilient multitenancy, robust concurrency controls, and high-fidelity user experience for automated workload validation.
+| Name | Role | Technical Contributions | GitHub |
+|---|---|---|:---:|
+| **Poojhaa K** | Team Lead & Technical Coordination | Coordinated team tasks, tracked project milestones, aligned development with UC-05 requirements, and supported integration reviews and team coordination. | [@Poojhaakarthikeyan](https://github.com/Poojhaakarthikeyan) |
+| **Sahana Shree VS** | Software Engineering & Application Development | Developed FastAPI backend APIs, authentication and tenant isolation; implemented R1–R4 validation, workload estimation, database models and quota controls; built the React/TypeScript Run Tools and History interfaces; and contributed to repository integration. | [@Sahanaa77](https://github.com/Sahanaa77) |
+| **Rohita M** | Documentation, QA & Deployment Lead | Prepared architecture documentation and diagrams, contributed to testing and acceptance evidence, and worked on CI/CD workflows, Terraform validation, and Azure deployment verification. | [@rohitam26](https://github.com/rohitam26) |
 
 ---
 
