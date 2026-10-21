@@ -1,128 +1,127 @@
-import React, { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { AppProvider, useApp } from './context/AppContext'
-import { Sidebar } from './components/Sidebar'
-import { TopBar } from './components/TopBar'
-import { BoundariesDialog } from './components/BoundariesDialog'
-import { RunHistoryDrawer } from './components/RunHistoryDrawer'
-import { DemoController } from './components/DemoController'
-import { ToastContainer } from './components/ToastContainer'
-import { Dashboard } from './pages/Dashboard'
-import { ModelDefine } from './pages/ModelDefine'
-import { Simulator } from './pages/Simulator'
-import { Verification } from './pages/Verification'
-import { Reports } from './pages/Reports'
-import { BoundedExploration } from './pages/BoundedExploration'
-import { ViolationMinimization } from './pages/ViolationMinimization'
-import { InspectStateDiff } from './pages/InspectStateDiff'
-import { FixRetest } from './pages/FixRetest'
-import { RegressionExport } from './pages/RegressionExport'
+import React, { useState, useEffect, ErrorInfo, ReactNode } from 'react'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { RunTools } from './pages/RunTools'
 import { WorkloadHistory } from './pages/WorkloadHistory'
+import { AuthProvider } from './context/AuthContext'
+import { ToastProvider, ThemeProvider, Button } from './components/ui'
+import { Shell } from './components/Shell'
+import { AlertTriangle, RotateCcw, WifiOff } from 'lucide-react'
 
-export const AppContent: React.FC = () => {
-  const [isBoundariesOpen, setIsBoundariesOpen] = useState(false)
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
-  const location = useLocation()
-  const { toasts, dismissToast } = useApp()
+// Offline Status Strip
+export const OfflineBanner: React.FC = () => {
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
 
   useEffect(() => {
-    const path = location.pathname
-    let title = 'WorkloadLens — Automation Workload Preview SaaS (UC-05)'
-    if (path.startsWith('/tools')) title = 'Run Tools — WorkloadLens'
-    else if (path.startsWith('/history')) title = 'Execution History — WorkloadLens'
-    else if (path.startsWith('/dashboard')) title = 'Dashboard — WorkloadLens'
-    else if (path.startsWith('/models')) title = 'Model Builder — WorkloadLens'
-    else if (path.startsWith('/simulator')) title = 'Event Simulator — WorkloadLens'
-    else if (path.startsWith('/verification')) title = 'Verification — WorkloadLens'
-    else if (path.startsWith('/reports')) title = 'Reports & Runs — WorkloadLens'
-    document.title = title
-  }, [location.pathname])
+    const handleOnline = () => setIsOffline(false)
+    const handleOffline = () => setIsOffline(true)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  if (!isOffline) return null
 
   return (
-    <div className="min-h-screen flex bg-bg text-text">
-      {/* Left Sidebar */}
-      <Sidebar
-        onOpenBoundaries={() => setIsBoundariesOpen(true)}
-        isMobileOpen={isMobileNavOpen}
-        onCloseMobile={() => setIsMobileNavOpen(false)}
-      />
+    <div
+      role="alert"
+      className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-semibold flex items-center justify-center gap-2 border-b border-amber-600 shadow-xs z-50 sticky top-0"
+    >
+      <WifiOff className="w-4 h-4 text-slate-950" />
+      <span>You are currently offline. Workload submissions and server sync will fail until reconnected.</span>
+    </div>
+  )
+}
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        {/* Top Bar */}
-        <TopBar onToggleMobileMenu={() => setIsMobileNavOpen((prev) => !prev)} />
+// Error Boundary with Retry
+interface ErrorBoundaryProps {
+  children: ReactNode
+}
 
-        {/* Dynamic Route View */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          <Routes>
-            {/* UC-05 Standard Screens */}
-            <Route path="/tools" element={<RunTools />} />
-            <Route path="/history" element={<WorkloadHistory />} />
+interface ErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+}
 
-            {/* Preserved Model Exploration Workbench Screens */}
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/models" element={<ModelDefine />} />
-            <Route path="/simulator" element={<Simulator />} />
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
 
-            {/* Verification 6-step flow nested under /verification/* */}
-            <Route path="/verification" element={<Verification />}>
-              <Route index element={<Navigate to="/verification/model" replace />} />
-              <Route path="model" element={<ModelDefine />} />
-              <Route path="explore" element={<BoundedExploration />} />
-              <Route path="minimize" element={<ViolationMinimization />} />
-              <Route path="diff" element={<InspectStateDiff />} />
-              <Route path="fix" element={<FixRetest />} />
-              <Route path="export" element={<RegressionExport />} />
-            </Route>
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error }
+  }
 
-            <Route path="/reports" element={<Reports />} />
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('WorkloadLens ErrorBoundary caught an unhandled rendering error:', error, errorInfo)
+  }
 
-            {/* Backward-compatible route aliases */}
-            <Route path="/explore" element={<Navigate to="/verification/explore" replace />} />
-            <Route path="/minimize" element={<Navigate to="/verification/minimize" replace />} />
-            <Route path="/diff" element={<Navigate to="/verification/diff" replace />} />
-            <Route path="/fix" element={<Navigate to="/verification/fix" replace />} />
-            <Route path="/export" element={<Navigate to="/verification/export" replace />} />
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null })
+  }
 
-            {/* Default root navigation points to WorkloadLens Run Tools */}
-            <Route path="/" element={<Navigate to="/tools" replace />} />
-            <Route path="*" element={<Navigate to="/tools" replace />} />
-          </Routes>
-        </main>
-
-        <footer className="border-t border-border bg-surface py-3 text-xs text-muted">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div>
-              <span>WorkloadLens &copy; 2026 &middot; Automation Workload Preview SaaS (UC-05)</span>
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-background text-text flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-surface border border-border rounded-2xl p-6 shadow-xl text-center space-y-4">
+            <div className="w-12 h-12 rounded-xl bg-danger/10 text-danger flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
             </div>
-            <div>
-              <button
-                onClick={() => setIsBoundariesOpen(true)}
-                className="hover:text-primary transition-colors underline-offset-2 hover:underline cursor-pointer"
-              >
-                Project Boundaries &amp; Verification Rules
-              </button>
+            <h2 className="text-lg font-bold text-text">Something went wrong</h2>
+            <p className="text-xs text-muted">
+              {this.state.error?.message || 'An unexpected rendering error occurred in the application.'}
+            </p>
+            <div className="flex gap-2 justify-center pt-2">
+              <Button variant="primary" size="sm" onClick={this.handleRetry}>
+                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                Try again
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
+                Reload application
+              </Button>
             </div>
           </div>
-        </footer>
-      </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
-      <BoundariesDialog isOpen={isBoundariesOpen} onClose={() => setIsBoundariesOpen(false)} />
-      <RunHistoryDrawer />
-      <DemoController onOpenBoundaries={() => setIsBoundariesOpen(true)} />
-      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-    </div>
+export const AppContent: React.FC = () => {
+  return (
+    <>
+      <OfflineBanner />
+      <Shell>
+        <Routes>
+          <Route path="/tools" element={<RunTools />} />
+          <Route path="/history" element={<WorkloadHistory />} />
+          <Route path="/" element={<Navigate to="/tools" replace />} />
+          <Route path="*" element={<Navigate to="/tools" replace />} />
+        </Routes>
+      </Shell>
+    </>
   )
 }
 
 export const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <AppProvider>
-        <AppContent />
-      </AppProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <AuthProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              <AppContent />
+            </ToastProvider>
+          </ThemeProvider>
+        </AuthProvider>
+      </HashRouter>
+    </ErrorBoundary>
   )
 }
+
 export default App

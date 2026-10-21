@@ -1,200 +1,321 @@
-# WorkloadLens
+# WorkloadLens — Automation Workload Preview SaaS
 
-> **Automation Workload Preview SaaS** — Advantix Cloud & SaaS Engineering Challenge (UC-05)<br>
-> **Team:** Code Sapiens | **Revision:** 2
+**UC-05 | Cloud and SaaS Engineering Challenge | Team Code Sapiens**
 
----
+WorkloadLens is a multi-tenant SaaS application that validates proposed automation jobs and provides a workload preview for eligible Pro subscribers. It checks job inputs, estimates processing effort, records run results, and enforces subscription plans, user permissions, daily quotas, and tenant isolation.
 
-## 1. Overview
+The workload estimate uses the challenge's fixed teaching rule of **10 milliseconds per record**. It is an illustrative estimate, not a real-world performance guarantee.
 
-**WorkloadLens** is a multi-tenant SaaS service designed to evaluate proposed automation jobs and estimate processing effort before execution:
-- **Basic Customers**: Validate automation job requests against four strict domain rules (R1–R4) with a quota of 3 accepted runs per UTC day.
-- **Pro Customers**: Validate job requests and generate a detailed processing workload preview (10 ms/record estimation rule) with a quota of 10 accepted runs per UTC day.
-- **Core SaaS Controls**: Enforces trusted tenant session context, role-based access control (Operator submit vs. Viewer read-only), atomic daily quota reservation, and request deduplication via `Idempotency-Key`.
+## Overview
 
----
+WorkloadLens provides two operations:
 
-## 2. Architecture Diagram
+- **Validate:** Check automation job requests against four validation rules and report valid rows, invalid rows, and validation issues.
+- **Process:** Generate a workload preview for valid requests, including per-job estimated effort and an aggregate summary. This operation is available to Pro subscribers.
 
-The diagram below illustrates the WorkloadLens target architecture, distinguishing the client screens, API routes, business validation logic, and cloud hosting infrastructure.
+The application is designed around the shared UC-05 SaaS contract, with two standard screens: **Run Tools** and **History**.
 
-```mermaid
-flowchart TD
-    %% ------------------------------------------------------------------------
-    %% WorkloadLens: System Architecture Diagram
-    %% ------------------------------------------------------------------------
+## Key Features
 
-    subgraph CLIENT ["1. Client & User Interface (React 19, TypeScript)"]
-        UI_TOOLS["Run Tools Screen (/tools): Parameter submission, Plan & Quota indicator"]
-        UI_HIST["History Screen (/history): Execution timeline, Status & Result inspector"]
-    end
+- **Four validation rules:** Validate record IDs, supported tools, record counts, and execution environments.
+- **Workload estimation:** Calculate estimated processing time and total record counts.
+- **Multi-tenant access control:** Isolate data by verified tenant identity.
+- **Subscription enforcement:** Support Basic and Pro plans, Operator and Viewer roles, and suspended subscriptions.
+- **Daily usage limits:** Enforce tenant-wide quotas using UTC calendar days.
+- **Idempotent requests:** Prevent duplicate execution and quota consumption when an accepted request is replayed with the same key and input.
+- **Run history:** Retrieve past runs and their recorded results.
+- **Failure handling:** Persist accepted runs that fail during processing without refunding their quota.
+- **Cloud deployment:** Terraform-based infrastructure and deployment, verification, and cleanup scripts.
+- **Automation skill:** A `SKILL.md` guide for repeatable deployment and verification workflows.
 
-    subgraph API ["2. Backend API Layer (FastAPI, Port 8000)"]
-        AUTH_MW["Auth & Tenant Context Middleware: Trusted Session Context"]
-        R_PUB["Public: GET /health"]
-        R_TENANT["Tenant: GET /tools, GET /subscription"]
-        R_RUNS["Runs: POST /runs, GET /runs, GET /runs/{id}/result"]
-    end
+## How It Works
 
-    subgraph LOGIC ["3. SaaS Logic & Processor Engine"]
-        IDEMP["Idempotency Engine: Key + Tenant Hash, 409 Conflict Guard"]
-        QUOTA["Atomic Quota Guard: UTC Daily Counter (Basic: 3, Pro: 10)"]
-        VAL["Validation Engine: Rules R1 to R4 (record_id, tool, count, env)"]
-        HELPER["Processing Helper: 10 ms / record workload estimator"]
-    end
+1. An authenticated user opens Run Tools.
+2. The backend identifies the user's tenant, role, subscription, and plan.
+3. The user submits a batch for validation or processing.
+4. WorkloadLens checks the request structure and applies the four row-validation rules.
+5. The backend checks request idempotency and atomically reserves quota for a newly accepted run.
+6. The run is persisted, processed, and marked `Succeeded` or `Failed`.
+7. The result is available through the API and History screen.
 
-    subgraph DATA ["4. Persistence Layer"]
-        DB_RUNS[("Runs Table: tenant_id, key, status, fingerprint")]
-        DB_USAGE[("DailyUsage Table: tenant_id, utc_date, count")]
-        BLOB_STORE[("Azure Blob Storage: workloadlens-data (Results Cache)")]
-    end
+## Validation Rules
 
-    subgraph CLOUD ["5. Cloud Hosting & Deployment (Azure)"]
-        ACA["Azure Container App: workloadlens-api-dev (Port 8000)"]
-        ACR["Azure Container Registry: uc05registry7bef65da.azurecr.io"]
-        GHA["GitHub Actions CI: Tests, Frontend Build, Terraform Validate, Image Push"]
-    end
+| Rule | Field | Requirement |
+|---|---|---|
+| R1 | `record_id` | Nonempty string, maximum 20 characters, unique within the batch |
+| R2 | `tool` | Must be `EXPORT` or `VALIDATE` |
+| R3 | `record_count` | Integer from 1 through 1000; booleans and numeric strings are invalid |
+| R4 | `environment` | Must be `TEST` or `STAGE` |
 
-    %% Client to API
-    CLIENT -->|HTTPS / Bearer Token| AUTH_MW
-    AUTH_MW --> R_PUB
-    AUTH_MW --> R_TENANT
-    AUTH_MW --> R_RUNS
+Strings are trimmed before validation. Record IDs remain case-sensitive, and only subsequent occurrences of a duplicate ID are marked as duplicates. Each invalid row is counted once, even if it violates multiple rules.
 
-    %% API to Logic
-    R_RUNS --> IDEMP
-    IDEMP --> QUOTA
-    QUOTA --> VAL
-    VAL -->|Valid & Process| HELPER
+## Example Workload Preview
 
-    %% Logic to Data
-    IDEMP <--> DB_RUNS
-    QUOTA <--> DB_USAGE
-    HELPER -.->|Optional Blob Offload| BLOB_STORE
+Input:
 
-    %% Hosting & Cloud Pipeline
-    GHA -->|Build & Push Image| ACR
-    ACR -->|Pull on Deploy| ACA
-    ACA --- API
-    ACA -.->|Private Blob Access| BLOB_STORE
+| Record ID | Tool | Record Count | Environment |
+|---|---|---:|---|
+| J01 | EXPORT | 20 | TEST |
+| J02 | VALIDATE | 10 | STAGE |
 
-    %% Monochrome Styling
-    classDef default fill:#ffffff,stroke:#000000,stroke-width:1.5px,color:#000000;
-    classDef storage fill:#fcfcfc,stroke:#000000,stroke-width:1.5px,stroke-dasharray: 4 2,color:#000000;
-    class DB_RUNS,DB_USAGE,BLOB_STORE storage;
+Expected processing result:
+
+| Record ID | Estimated Time |
+|---|---:|
+| J01 | 200 ms |
+| J02 | 100 ms |
+
+Summary:
+
+- Input rows: `2`
+- Total records: `30`
+- Total estimated time: `300 ms`
+
+The valid fixture should produce two valid rows and zero invalid rows. The invalid fixture adds four rows containing one R1–R4 failure each, producing two valid rows and four invalid rows.
+
+## SaaS Plans and Permissions
+
+| Capability | Basic | Pro |
+|---|---|---|
+| Validate jobs | Allowed | Allowed |
+| Process jobs | Not allowed | Allowed |
+| Accepted runs per tenant per UTC day | 3 | 10 |
+
+**Roles**
+
+- **Operator:** Can submit eligible runs and read the tenant's run history and results.
+- **Viewer:** Read-only access to the tenant's permitted information.
+
+The daily allowance is shared by all users within a tenant. Suspended subscriptions cannot start new runs, but authorised users can still access historical data.
+
+Each accepted unique run consumes one quota slot, including runs that subsequently fail. Rejected requests do not consume quota.
+
+## Technology and Architecture
+
+- **Frontend:** React, TypeScript, Vite
+- **Backend:** Python and FastAPI
+- **Persistence:** SQL database
+- **Object storage:** Private Azure Blob container
+- **Cloud platform:** Azure Container Apps
+- **Infrastructure as Code:** Terraform
+- **Automation:** Shell scripts and `skills/automation-preview/SKILL.md`
+- **CI/CD:** GitHub Actions workflow for backend image build and push
+
+### Logical Architecture
+
+```text
+Operator / Viewer
+       |
+       v
+React Web Application
+       |
+       v
+FastAPI Backend
+       |
+       +--> Authentication and tenant authorization
+       |
+       +--> Request validation and idempotency
+       |
+       +--> Subscription and quota enforcement
+       |
+       +--> Workload processing helper
+       |
+       +--> SQL Database
+       |      Runs
+       |      DailyUsage
+       |      Subscription data
+       |
+       +--> Private Blob Storage
+              Result storage
 ```
 
----
+The verified identity determines the tenant. Tenant identity must not be trusted from request bodies or editable browser fields.
 
-## 3. Specification & Input Rules (UC-05)
+## API Reference
 
-### Validation Rules (R1–R4)
-Every submitted row is checked against all four rules. Strings are trimmed, IDs are case-sensitive, and each invalid row is counted once:
+WorkloadLens exposes the six required API routes.
 
-| Rule | Target Field | Valid Condition | Failing Condition (400 Bad Request) |
-|---|---|---|---|
-| **R1** | `record_id` | Non-empty string, length ≤ 20 characters, unique within the batch | Empty, >20 chars, or duplicate within batch |
-| **R2** | `tool` | Must be `EXPORT` or `VALIDATE` | Any other value (e.g. `DELETE`, `IMPORT`) |
-| **R3** | `record_count` | Integer from 1 to 1000 inclusive | Booleans, numeric strings, <1, or >1000 |
-| **R4** | `environment` | Must be `TEST` or `STAGE` | Any other value (e.g. `PROD`, `DEV`) |
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/health` | Public health check |
+| GET | `/tools` | List available tools and operations |
+| GET | `/subscription` | Retrieve the current tenant's subscription and plan |
+| POST | `/runs` | Validate or process a batch |
+| GET | `/runs` | List the current tenant's runs |
+| GET | `/runs/{id}/result` | Retrieve an authorised run's result or recorded failure |
 
-### Workload Fixtures
-- **Valid Fixture (2 rows)**:
-  - Row 1: `record_id: "J01"`, `tool: "EXPORT"`, `record_count: 20`, `environment: "TEST"` → 200 ms
-  - Row 2: `record_id: "J02"`, `tool: "VALIDATE"`, `record_count: 10`, `environment: "STAGE"` → 100 ms
-  - *Expected Pro Result:* Summary with `input_rows: 2`, `total_records: 30`, `total_estimated_ms: 300`.
-- **Invalid Fixture (6 rows)**: 2 valid rows + 4 mutated copies (duplicate J01 for R1; tool `DELETE` for R2; count `0` for R3; env `PROD` for R4). Reports 2 valid, 4 invalid, with issues for R1–R4.
+### Submit a Run
 
----
+`POST /runs` requires an `Idempotency-Key` header and a JSON body containing `operation` and `records`.
 
-## 4. Implementation & Acceptance Verification
+Supported operations are `validate` and `process`. A request must contain 1–10 records and remain within the 64 KiB request limit.
 
-All six required routes and domain logic are implemented and backed by **32 passing backend tests** (`pytest tests/`):
+Important response behaviour:
 
-1. **API Endpoints (`GET /health`, `GET /tools`, `GET /subscription`, `POST /runs`, `GET /runs`, `GET /runs/{id}/result`)**:
-   - `/health` is public and exposes zero tenant information.
-   - All other endpoints require trusted session authentication context.
-   - `POST /admin/reset` is removed from public product routing.
-2. **Acceptance Checks A02–A11 (Verified)**:
-   - **A02 (Valid Fixture)**: 2 valid rows, 0 invalid rows, no issues reported.
-   - **A03 (Invalid Fixture)**: 2 valid rows, 4 invalid rows, R1–R4 rule failures reported.
-   - **A04 (Pro Process & Durability)**: Exact estimated times (J01: 200 ms, J02: 100 ms, total: 300 ms) persisted and retrievable via `GET /runs/{id}/result`.
-   - **A05 (Invalid Process & Bounds Rejection)**: Invalid process input, wrong-shaped body, and >10-row batch return HTTP 400 without creating runs or debiting quota.
-   - **A06 (Auth & Role Enforcement)**: Unauthenticated requests return 401; Viewer submission and Basic process return 403.
-   - **A07 (Tenant Isolation)**: Cross-tenant run retrieval returns 404; tenant override in request body is rejected with 400.
-   - **A08 (Daily Quota & Concurrency)**: Basic quota limit of 3 enforced (4th returns 429); atomic conditional SQL update guarantees exactly 1 accepted run under concurrent race conditions.
-   - **A09 (Idempotency Replay)**: Matching terminal replay returns HTTP 200 with original run without re-execution or quota debit (even when quota is exhausted); changed input returns 409.
-   - **A10 (Suspended Subscription)**: Suspended tenant rejects submissions with 403 while historical reads remain accessible.
-   - **A11 (Forced Failure Hook)**: `X-Test-Force-Failure` hook persists `Failed` status with recorded error, debits 1 quota slot, and replays without re-execution.
-3. **Frontend UI Screens**:
-   - **Run Tools (`/tools`)**: Parameter submission, plan and remaining quota display, validation/processing response tables.
-   - **History (`/history`)**: Tenant-scoped execution log and selected run result / recorded error viewer.
-   - Served statically by FastAPI at `/` when built.
+- `201`: New accepted run, processed to a terminal status.
+- `200`: Matching idempotent replay of a terminal run.
+- `400`: Invalid request shape or invalid batch for processing.
+- `401`: Missing authentication.
+- `403`: Insufficient role, plan entitlement, or active subscription.
+- `404`: Unknown run or run belonging to another tenant.
+- `409`: Idempotency conflict or a matching run that is still running.
+- `429`: Daily quota exhausted.
 
----
+Validation issues identify the row using a 1-based `row_index`, together with the `field` and `rule_id`.
 
-## 5. Live Cloud Deployment & Verification
+## Project Structure
 
-### Verified Endpoint
-- **Live Health URL:** `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/health`
-- **Region:** `centralindia` (Resource Group: `rg-uc05-demo`, Managed Environment: `uc05-env`)
-- **Status:** Healthy (`HTTP 200 OK`, `{"status":"ok","version":"0.1.0"}`)
+```text
+.
+├── backend/                     FastAPI application and backend tests
+├── frontend/                    React and TypeScript application
+├── infra/                       Terraform configuration
+│   └── environments/            Environment parameter files
+├── scripts/                     Deployment, verification and cleanup
+├── skills/
+│   └── automation-preview/
+│       └── SKILL.md              Automation workflow instructions
+├── tests/                       Application and acceptance tests
+├── evidence/                    Redacted verification evidence
+├── .github/
+│   └── workflows/               GitHub Actions workflows
+├── README.md
+└── RUNBOOK.md                   Deployment and operations guide, if present
+```
 
-### Quick Deployment Runbook
+The actual repository may contain additional files. The directory descriptions above indicate the intended responsibilities of each area.
+
+## Local Development
+
+### Prerequisites
+
+Install Python, Node.js with npm, Git, and the dependencies required by the project. Azure CLI and Terraform are needed for cloud deployment, not ordinary frontend development.
+
+### 1. Clone the repository
+
+```powershell
+git clone https://github.com/Sahanaa77/uc05-Code-Sapiens.git
+cd uc05-Code-Sapiens
+```
+
+### 2. Start the backend
+
+In PowerShell:
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+Set the required local environment variables according to the backend configuration and `.env.example` files. Do not commit secrets.
+
+If the backend entry point is `backend/app/main.py`, start it with:
+
+```powershell
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+If the supplied starter uses a different entry point, use the module path defined by the actual application. Keep the backend running in this terminal.
+
+### 3. Start the frontend
+
+Open a second terminal:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open the local URL printed by Vite, usually `http://localhost:5173`.
+
+Configure the frontend API base URL using the variable documented in `frontend/.env.example`. Ensure it points to the local backend.
+
+### 4. Build the frontend
+
+From the `frontend` directory:
+
+```powershell
+npm run build
+```
+
+A successful build should finish without TypeScript or bundling errors.
+
+### 5. Run tests
+
+From the repository root, inspect the test configuration and use the project's configured test commands. For a Python project using pytest, the usual command is:
+
+```powershell
+python -m pytest -q
+```
+
+Run the frontend build and relevant backend and acceptance tests before submitting changes. Record actual results rather than assuming that tests passed.
+
+## Azure Deployment
+
+The repository includes Terraform infrastructure and helper scripts intended for the assigned UC-05 environment.
+
+The challenge specifies two Terraform-managed resources:
+
+1. One Azure Container App.
+2. One private Blob container inside a pre-existing Storage Account.
+
+The Resource Group, Container Apps Environment, Storage Account, database, registry, managed identity, and permissions are supplied or configured through the authorised hackathon environment as applicable. Do not create or modify shared resources without permission.
+
+Before deployment:
+
+1. Confirm access to the assigned Azure sandbox and subscription.
+2. Obtain the correct environment parameters and required secrets.
+3. Build and publish the backend image to the authorised registry.
+4. Review the Terraform plan and confirm that only the intended resources are targeted.
+5. Deploy using the repository's scripts and verify `/health`.
+6. Run the acceptance checks and retain redacted evidence.
+
+Typical script entry points are:
 
 ```bash
-# 1. Inspect environment parameters
-nano infra/environments/dev.tfvars
-
-# 2. Export runtime secrets via shell environment
-export TF_VAR_database_url="postgresql://user:pass@host:5432/dbname"  # or sqlite fallback
-export TF_VAR_acr_password=$(az acr credential show --name uc05registry7bef65da --query "passwords[0].value" -o tsv)
-
-# 3. Deploy via guarded script
 ENV=dev ./scripts/deploy.sh
-
-# 4. Verify live health and infrastructure idempotency
-FQDN=$(terraform -chdir=infra output -raw container_app_fqdn)
-./scripts/verify.sh "${FQDN}" dev
-```
-
-### Verified Evidence Artifacts
-Real deployment evidence is cataloged in [`evidence/README.md`](evidence/README.md):
-- [`health-response.json`](evidence/health-response.json): Live API response (`HTTP 200`).
-- [`verify-curl.txt`](evidence/verify-curl.txt): Live HTTP response headers from Azure Container Apps.
-- [`terraform-plan.txt`](evidence/terraform-plan.txt): Pre-deployment plan showing exactly 2 resources to add.
-- [`terraform-apply.txt`](evidence/terraform-apply.txt): Apply log confirming 2 resources created.
-- [`terraform-no-changes.txt`](evidence/terraform-no-changes.txt): Second plan demonstrating zero infrastructure drift.
-- [`ci-results.md`](evidence/ci-results.md): GitHub Actions CI workflow run logs.
-
----
-
-## 6. Local Development & Testing
-
-```bash
-# Run backend test suite (32 passed: 21 engine + 11 UC-05 acceptance)
-cd backend && python -m pytest tests/
-
-# Build frontend production bundle
-cd frontend && npm run build
-
-# Validate Terraform configuration
-cd infra && terraform fmt -check && terraform validate
-```
-
----
-
-## 7. Operational Skills & Cleanup
-
-Operational procedures are defined in [`skills/automation-preview/SKILL.md`](skills/automation-preview/SKILL.md).
-
-### Safe Tear-Down
-```bash
-# Dry-run inspection (safe — makes no changes)
+./scripts/verify.sh <application-url>
 ENV=dev ./scripts/cleanup.sh
-
-# Targeted deletion (requires typing Container App name to confirm)
-ENV=dev ./scripts/cleanup.sh --execute
 ```
 
-> **Safety Notice:** Cleanup removes ONLY `azurerm_container_app.api` and `azurerm_storage_container.data`. The Resource Group, Container Apps Environment, Storage Account, and Database are shared dependencies and are NEVER deleted.
+Check the scripts and `RUNBOOK.md` for their exact arguments, required environment variables, and cleanup confirmation procedure before running them. Never place credentials in Git or expose them in terminal logs.
+
+## Acceptance and Verification
+
+The UC-05 acceptance scope includes:
+
+- Terraform validation, deployment, healthy `/health`, and a no-change second plan.
+- Valid and invalid fixture results matching R1–R4.
+- Exact workload-preview rows and summary.
+- Result persistence and retrieval after an application restart.
+- Rejection of invalid processing requests, malformed bodies, and batches exceeding ten rows without quota debit.
+- Role, plan, subscription, and tenant-isolation enforcement.
+- Daily quota limits and atomic reservation under concurrent requests.
+- Idempotent replay and conflict handling.
+- Recorded processing failures and correct quota consumption.
+- A fresh assistant session reproducing the workflow using `SKILL.md`.
+
+Store evidence under `evidence/` only after the corresponding checks have actually been executed. Redact credentials, connection strings, access tokens, and other sensitive values.
+
+## Scope and Limitations
+
+- The workload estimate is a fixed educational calculation, not a production latency guarantee.
+- The application previews automation jobs; it does not execute external ERP writes or real-world automation.
+- Tenant isolation and execution permissions are core security requirements.
+- The challenge does not require payment checkout, signup, queues, schedulers, approval workflows, or additional administration screens.
+- The product's scored scope is the two operations, four validation rules, six API routes, two standard screens, subscription controls, and required automation and infrastructure deliverables.
+
+## Team and Repository
+
+**Team:** Code Sapiens  
+**Challenge:** Cloud and SaaS Engineering Challenges — Revision 2  
+**Use case:** UC-05 — Automation Workload Preview SaaS
+
+**Repository:** [Sahanaa77/uc05-Code-Sapiens](https://github.com/Sahanaa77/uc05-Code-Sapiens)
+
+---
+
+*WorkloadLens turns proposed automation jobs into validated, traceable workload previews while enforcing SaaS subscription and tenant boundaries.*

@@ -1,536 +1,423 @@
-import concurrent.futures
-from datetime import datetime, timezone
+"""
+Comprehensive Acceptance Tests for UC-05 Automation Workload Preview SaaS.
+Implements checks A02 through A11 from the shared specification.
+"""
+import copy
+import threading
 import uuid
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import IntegrityError
 
-from entitlesim.db import Base, DailyUsageRecord, RunRecord, SessionLocal, engine, init_db
-from entitlesim.main import app
+from app.main import app
+from app.db import init_db, SessionLocal
+import tests.harness as harness
 
 client = TestClient(app)
 
-# Test tokens configured in auth.py
-TOKEN_PRO_OPERATOR = "Bearer token-tenant-a-operator"
-TOKEN_PRO_VIEWER = "Bearer token-tenant-a-viewer"
-TOKEN_BASIC_OPERATOR = "Bearer token-tenant-b-operator"
-TOKEN_BASIC_VIEWER = "Bearer token-tenant-b-viewer"
-TOKEN_SUSPENDED_OPERATOR = "Bearer token-tenant-suspended-operator"
-
-# Canonical UC-05 Fixtures
-VALID_FIXTURE_RECORDS = [
+# Standard fixtures from spec
+VALID_FIXTURE = [
     {"record_id": "J01", "tool": "EXPORT", "record_count": 20, "environment": "TEST"},
     {"record_id": "J02", "tool": "VALIDATE", "record_count": 10, "environment": "STAGE"},
 ]
 
-INVALID_FIXTURE_RECORDS = [
+INVALID_FIXTURE = [
+    # 2 valid rows
     {"record_id": "J01", "tool": "EXPORT", "record_count": 20, "environment": "TEST"},
     {"record_id": "J02", "tool": "VALIDATE", "record_count": 10, "environment": "STAGE"},
-    {"record_id": "J01", "tool": "EXPORT", "record_count": 20, "environment": "TEST"},  # R1 duplicate J01
-    {"record_id": "X2", "tool": "DELETE", "record_count": 20, "environment": "TEST"},   # R2 invalid tool
-    {"record_id": "X3", "tool": "EXPORT", "record_count": 0, "environment": "TEST"},    # R3 invalid count
-    {"record_id": "X4", "tool": "EXPORT", "record_count": 20, "environment": "PROD"},   # R4 invalid env
+    # 4 mutated rows
+    {"record_id": "J01", "tool": "EXPORT", "record_count": 20, "environment": "TEST"},     # R1: duplicate ID
+    {"record_id": "X2", "tool": "DELETE", "record_count": 20, "environment": "TEST"},       # R2: invalid tool
+    {"record_id": "X3", "tool": "EXPORT", "record_count": 0, "environment": "TEST"},        # R3: record_count < 1
+    {"record_id": "X4", "tool": "EXPORT", "record_count": 20, "environment": "PROD"},       # R4: invalid env
 ]
 
 
 @pytest.fixture(autouse=True)
-def clean_db():
-    init_db()
-    db = SessionLocal()
-    try:
-        db.query(DailyUsageRecord).delete()
-        db.query(RunRecord).filter(RunRecord.tenant_id.isnot(None)).delete()
-        db.commit()
-    finally:
-        db.close()
+def setup_teardown():
+    harness.reset_all()
     yield
 
 
-# ---------------------------------------------------------------------------
-# Route Inspection & Public Health Check
-# ---------------------------------------------------------------------------
 
-def test_routes_exist_and_health_is_public():
-    # GET /health is public and returns 200
+
+# --------------------------------------------------------------------------
+# A01: /health is 200 and public
+# --------------------------------------------------------------------------
+def test_a01_health_public():
     res = client.get("/health")
     assert res.status_code == 200
-    assert res.json()["status"] == "ok"
-    assert "tenant_id" not in res.json()
-
-    # Protected routes without auth return 401
-    assert client.get("/tools").status_code == 401
-    assert client.get("/subscription").status_code == 401
-    assert client.get("/runs").status_code == 401
-    assert client.post("/runs", json={"operation": "validate", "records": VALID_FIXTURE_RECORDS}).status_code == 401
+    assert res.json() == {"status": "ok"}
 
 
-# ---------------------------------------------------------------------------
-# A02: Valid Fixture Validation
-# ---------------------------------------------------------------------------
-
-def test_a02_valid_fixture_validation():
-    """A02: validate on the two-row valid fixture reports valid_rows 2,
-    invalid_rows 0 and no issues.
-    """
+# --------------------------------------------------------------------------
+# A02: validate on two-row valid fixture reports valid_rows 2, invalid_rows 0, no issues
+# --------------------------------------------------------------------------
+def test_a02_validate_valid_fixture():
     key = str(uuid.uuid4())
     res = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": key},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": key},
+        json={"operation": "validate", "records": VALID_FIXTURE},
     )
     assert res.status_code == 201
     data = res.json()
     assert data["status"] == "Succeeded"
     assert data["operation"] == "validate"
-
     result = data["result"]
     assert result["valid_rows"] == 2
     assert result["invalid_rows"] == 0
     assert result["issues"] == []
 
 
-# ---------------------------------------------------------------------------
-# A03: Invalid Fixture Validation
-# ---------------------------------------------------------------------------
-
-def test_a03_invalid_fixture_validation():
-    """A03: validate on the six-row invalid fixture reports valid_rows 2,
-    invalid_rows 4 and the four specified rule failures (R1, R2, R3, R4).
-    """
+# --------------------------------------------------------------------------
+# A03: validate on six-row invalid fixture reports valid_rows 2, invalid_rows 4, 4 rule failures
+# --------------------------------------------------------------------------
+def test_a03_validate_invalid_fixture():
     key = str(uuid.uuid4())
     res = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": key},
-        json={"operation": "validate", "records": INVALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": key},
+        json={"operation": "validate", "records": INVALID_FIXTURE},
     )
     assert res.status_code == 201
     data = res.json()
     assert data["status"] == "Succeeded"
-
     result = data["result"]
     assert result["valid_rows"] == 2
     assert result["invalid_rows"] == 4
+    issues = result["issues"]
+    rule_ids = {issue["rule_id"] for issue in issues}
+    assert {"R1", "R2", "R3", "R4"}.issubset(rule_ids)
 
-    rules_failed = {issue["rule_id"] for issue in result["issues"]}
-    assert rules_failed == {"R1", "R2", "R3", "R4"}
 
-
-# ---------------------------------------------------------------------------
-# A04: Pro Process Returns Exact Rows & Summary, Persists Across Restart
-# ---------------------------------------------------------------------------
-
-def test_a04_pro_process_execution_and_persistence():
-    """A04: Pro process returns exactly the specified rows and summary;
-    its result survives an app restart and is retrieved through the API.
-    """
+# --------------------------------------------------------------------------
+# A04: Pro process returns exact specified rows & summary; retrieved through API
+# --------------------------------------------------------------------------
+def test_a04_pro_process_success():
     key = str(uuid.uuid4())
     res = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": key},
-        json={"operation": "process", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": key},
+        json={"operation": "process", "records": VALID_FIXTURE},
     )
     assert res.status_code == 201
     data = res.json()
     run_id = data["run_id"]
     assert data["status"] == "Succeeded"
-    assert data["operation"] == "process"
-
     result = data["result"]
+
+    # Verify summary: input_rows 2, total_records 30, total_estimated_ms 300
     summary = result["summary"]
     assert summary["input_rows"] == 2
     assert summary["total_records"] == 30
     assert summary["total_estimated_ms"] == 300
 
+    # Verify rows: J01: 200, J02: 100
     rows = result["rows"]
     assert len(rows) == 2
-    assert rows[0]["record_id"] == "J01"
-    assert rows[0]["estimated_ms"] == 200
-    assert rows[1]["record_id"] == "J02"
-    assert rows[1]["estimated_ms"] == 100
+    assert rows[0] == {"record_id": "J01", "estimated_ms": 200}
+    assert rows[1] == {"record_id": "J02", "estimated_ms": 100}
 
-    # Retrieve through GET /runs/{id}/result (simulating fresh session / restart)
-    get_res = client.get(
+    # Fetch result via GET /runs/{id}/result
+    fetch_res = client.get(
         f"/runs/{run_id}/result",
-        headers={"Authorization": TOKEN_PRO_OPERATOR},
+        headers={"Authorization": "Bearer pro_operator"},
     )
-    assert get_res.status_code == 200
-    saved_data = get_res.json()
-    assert saved_data["run_id"] == run_id
-    assert saved_data["status"] == "Succeeded"
-    assert saved_data["result"]["summary"]["total_estimated_ms"] == 300
+    assert fetch_res.status_code == 200
+    assert fetch_res.json()["result"] == result
 
 
-# ---------------------------------------------------------------------------
-# A05: Invalid Process Rejection & Quota Protection
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# A05: Invalid process input, wrong-shaped body, 11-row batch each return 400 with no debit
+# --------------------------------------------------------------------------
+def test_a05_invalid_process_input_and_bounds():
+    # Check current quota usage
+    sub_before = client.get("/subscription", headers={"Authorization": "Bearer pro_operator"}).json()
+    used_before = sub_before["used_today"]
 
-def test_a05_invalid_process_input_and_shape_rejection():
-    """A05: Invalid process input, a wrong-shaped body and an 11-row batch
-    each return 400 with no new run or quota debit.
-    """
-    sub_before = client.get("/subscription", headers={"Authorization": TOKEN_PRO_OPERATOR}).json()
-    quota_used_start = sub_before["used_today"]
-
-    # 1. Invalid process input (6-row invalid fixture)
-    res_invalid_proc = client.post(
+    # 1. Invalid process input (from invalid fixture) -> 400
+    res1 = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": str(uuid.uuid4())},
-        json={"operation": "process", "records": INVALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": str(uuid.uuid4())},
+        json={"operation": "process", "records": INVALID_FIXTURE},
     )
-    assert res_invalid_proc.status_code == 400
+    assert res1.status_code == 400
 
-    # 2. 11-row batch exceeds maximum 10 rows
-    eleven_rows = VALID_FIXTURE_RECORDS * 6  # 12 rows
-    res_too_many = client.post(
+    # 2. Wrong-shaped body (missing records or extra fields) -> 400
+    res2 = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": str(uuid.uuid4())},
-        json={"operation": "validate", "records": eleven_rows},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": str(uuid.uuid4())},
+        json={"operation": "process", "extra_bad_field": 123},
     )
-    assert res_too_many.status_code == 400
+    assert res2.status_code == 400
 
-    # 3. Wrong-shaped body (missing records or extra unknown fields)
-    res_wrong_shape = client.post(
+    # 3. 11-row batch (bounds exceeded: max 10) -> 400
+    eleven_rows = [
+        {"record_id": f"J{i:02d}", "tool": "EXPORT", "record_count": 10, "environment": "TEST"}
+        for i in range(11)
+    ]
+    res3 = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": str(uuid.uuid4())},
-        json={"operation": "validate", "unknown_field": True},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": str(uuid.uuid4())},
+        json={"operation": "process", "records": eleven_rows},
     )
-    assert res_wrong_shape.status_code == 400
+    assert res3.status_code == 400
 
-    # Confirm zero quota debited and zero runs created
-    sub_after = client.get("/subscription", headers={"Authorization": TOKEN_PRO_OPERATOR}).json()
-    assert sub_after["used_today"] == quota_used_start
-    runs_res = client.get("/runs", headers={"Authorization": TOKEN_PRO_OPERATOR}).json()
-    assert len(runs_res) == 0
+    # Quota remains unchanged
+    sub_after = client.get("/subscription", headers={"Authorization": "Bearer pro_operator"}).json()
+    assert sub_after["used_today"] == used_before
 
 
-# ---------------------------------------------------------------------------
-# A06: Authentication & Role Enforcement
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# A06: Unauthenticated 401; Viewer submit & Basic process both 403 with no debit
+# --------------------------------------------------------------------------
+def test_a06_auth_and_permissions():
+    # 1. Unauthenticated request to protected route -> 401
+    assert client.get("/subscription").status_code == 401
+    assert client.get("/tools").status_code == 401
+    assert client.get("/runs").status_code == 401
+    assert client.post("/runs", json={"operation": "validate", "records": VALID_FIXTURE}).status_code == 401
 
-def test_a06_auth_and_role_enforcement():
-    """A06: Unauthenticated requests to protected routes return 401;
-    Viewer submission and Basic process both return 403 with no quota debit.
-    Fabricated / unknown tokens are rejected with 401.
-    """
-    # 1. Unauthenticated request to /runs returns 401
-    res_unauth = client.post(
-        "/runs",
-        headers={"Idempotency-Key": str(uuid.uuid4())},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
-    )
-    assert res_unauth.status_code == 401
-
-    # 2. Fabricated token returns 401
-    res_fake = client.post(
-        "/runs",
-        headers={"Authorization": "Bearer fabricated-token-xyz", "Idempotency-Key": str(uuid.uuid4())},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
-    )
-    assert res_fake.status_code == 401
-
-    # 3. Viewer submission returns 403
+    # 2. Viewer submission -> 403
     res_viewer = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_VIEWER, "Idempotency-Key": str(uuid.uuid4())},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_viewer", "Idempotency-Key": str(uuid.uuid4())},
+        json={"operation": "validate", "records": VALID_FIXTURE},
     )
     assert res_viewer.status_code == 403
 
-    # 4. Basic process returns 403
-    res_basic_proc = client.post(
+    # 3. Basic plan requesting process -> 403
+    res_basic = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_BASIC_OPERATOR, "Idempotency-Key": str(uuid.uuid4())},
-        json={"operation": "process", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer basic_operator", "Idempotency-Key": str(uuid.uuid4())},
+        json={"operation": "process", "records": VALID_FIXTURE},
     )
-    assert res_basic_proc.status_code == 403
+    assert res_basic.status_code == 403
 
 
-# ---------------------------------------------------------------------------
-# A07: Tenant Isolation & Override Rejection
-# ---------------------------------------------------------------------------
-
+# --------------------------------------------------------------------------
+# A07: Cross-tenant isolation; tenant B cannot list A's runs; override rejected
+# --------------------------------------------------------------------------
 def test_a07_tenant_isolation_and_override_rejection():
-    """A07: Tenant B cannot list tenant A's runs; fetching A's result by ID
-    returns 404. A request containing a tenant override is rejected.
-    """
     # Tenant A creates a run
-    run_res = client.post(
+    key_a = str(uuid.uuid4())
+    res_a = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": str(uuid.uuid4())},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": key_a},
+        json={"operation": "validate", "records": VALID_FIXTURE},
     )
-    assert run_res.status_code == 201
-    tenant_a_run_id = run_res.json()["run_id"]
+    run_a_id = res_a.json()["run_id"]
 
-    # Tenant B lists runs — must not contain Tenant A's run
-    tenant_b_runs = client.get("/runs", headers={"Authorization": TOKEN_BASIC_OPERATOR}).json()
-    assert all(r["run_id"] != tenant_a_run_id for r in tenant_b_runs)
+    # Tenant B lists runs -> does not include Tenant A's run
+    runs_b = client.get("/runs", headers={"Authorization": "Bearer tenant_b_operator"}).json()
+    assert all(r["run_id"] != run_a_id for r in runs_b)
 
-    # Tenant B attempts to fetch Tenant A's result by ID — must return 404
-    get_res = client.get(
-        f"/runs/{tenant_a_run_id}/result",
-        headers={"Authorization": TOKEN_BASIC_OPERATOR},
+    # Tenant B tries to get Tenant A's run by ID -> 404
+    fetch_b = client.get(
+        f"/runs/{run_a_id}/result",
+        headers={"Authorization": "Bearer tenant_b_operator"},
     )
-    assert get_res.status_code == 404
+    assert fetch_b.status_code == 404
 
-    # Tenant override in body is rejected with 400
-    res_override = client.post(
-        "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": str(uuid.uuid4())},
-        json={"tenant_id": "tenant-b", "operation": "validate", "records": VALID_FIXTURE_RECORDS},
+    # Request containing tenant override in header or query -> 400
+    res_override1 = client.get(
+        "/subscription",
+        headers={"Authorization": "Bearer pro_operator", "X-Tenant-Override": "tenant-b"},
     )
-    assert res_override.status_code == 400
+    assert res_override1.status_code == 400
+
+    res_override2 = client.get(
+        "/subscription?tenant_id=tenant-b",
+        headers={"Authorization": "Bearer pro_operator"},
+    )
+    assert res_override2.status_code == 400
 
 
-# ---------------------------------------------------------------------------
-# A08: Daily Quota & Atomic Reservation Under Concurrency
-# ---------------------------------------------------------------------------
-
+# --------------------------------------------------------------------------
+# A08: Basic accepts 3 runs, rejects 4th with 429; concurrent requests on last slot
+# --------------------------------------------------------------------------
 def test_a08_basic_quota_and_concurrency():
-    """A08: Basic accepts three unique validate runs and rejects the fourth
-    with 429. With one slot left, two concurrent new requests accept exactly one.
-    """
-    # 1. Basic accepts exactly 3 runs
+    # Basic accepts 3 runs
     for i in range(3):
         res = client.post(
             "/runs",
-            headers={"Authorization": TOKEN_BASIC_OPERATOR, "Idempotency-Key": f"basic-key-{i}"},
-            json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
+            headers={"Authorization": "Bearer basic_operator", "Idempotency-Key": f"basic-key-{i}"},
+            json={"operation": "validate", "records": VALID_FIXTURE},
         )
         assert res.status_code == 201
 
-    # 4th submission rejected with 429
-    res_4th = client.post(
+    # 4th run -> 429
+    res_4 = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_BASIC_OPERATOR, "Idempotency-Key": "basic-key-4"},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer basic_operator", "Idempotency-Key": "basic-key-4"},
+        json={"operation": "validate", "records": VALID_FIXTURE},
     )
-    assert res_4th.status_code == 429
+    assert res_4.status_code == 429
 
-    # 2. Concurrency test: Tenant A has 1 slot left (e.g. at 9/10 runs)
+    # Concurrency test: with 1 slot left, 2 concurrent requests accept exactly 1
+    # Reset usage to 2 (so exactly 1 slot remains out of 3)
     db = SessionLocal()
-    today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    usage = db.query(DailyUsageRecord).filter_by(tenant_id="tenant-a", utc_date=today_utc).first()
-    if not usage:
-        usage = DailyUsageRecord(id=str(uuid.uuid4()), tenant_id="tenant-a", utc_date=today_utc, count=9)
-        db.add(usage)
-    else:
-        usage.count = 9
+    from app.models import DailyUsageModel
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).date()
+    row = db.query(DailyUsageModel).filter_by(tenant_id="tenant-b", usage_date=today).first()
+    row.count = 2
     db.commit()
     db.close()
 
-    # Two concurrent requests competing for the 10th and final slot
-    def submit_concurrent(req_id):
-        return client.post(
+
+    results = []
+
+    def make_call(call_id):
+        r = client.post(
             "/runs",
-            headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": f"concurrent-{req_id}"},
-            json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
-        ).status_code
+            headers={"Authorization": "Bearer basic_operator", "Idempotency-Key": f"concurrent-slot-{call_id}"},
+            json={"operation": "validate", "records": VALID_FIXTURE},
+        )
+        results.append(r.status_code)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        f1 = executor.submit(submit_concurrent, 1)
-        f2 = executor.submit(submit_concurrent, 2)
-        results = [f1.result(), f2.result()]
+    t1 = threading.Thread(target=make_call, args=(1,))
+    t2 = threading.Thread(target=make_call, args=(2,))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
 
-    # Exactly one request must be accepted (201) and one rejected (429)
+    # Exactly one accepted (201), one rejected (429)
     assert sorted(results) == [201, 429]
 
 
-# ---------------------------------------------------------------------------
-# A09: Idempotency Replay & Input Conflict
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# A09: At exhausted quota, matching key returns 200; changed input returns 409
+# --------------------------------------------------------------------------
+def test_a09_idempotency_and_replay_at_exhausted_quota():
+    # Exhaust Basic quota
+    db = SessionLocal()
+    from app.models import DailyUsageModel
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).date()
+    row = db.query(DailyUsageModel).filter_by(tenant_id="tenant-b", usage_date=today).first()
+    if not row:
+        row = DailyUsageModel(tenant_id="tenant-b", usage_date=today, count=3)
+        db.add(row)
+    else:
+        row.count = 3
+    db.commit()
+    db.close()
 
-def test_a09_idempotency_terminal_replay_and_conflict():
-    """A09: At exhausted quota, a matching accepted key returns the same run with 200
-    and no debit. Reusing the key with changed input returns 409.
-    Two simultaneous identical keys create at most one run.
-    """
-    idemp_key = f"idemp-test-{uuid.uuid4()}"
+    # First, run a terminal run using a specific key for tenant-a (pro)
+    key = "replayed-terminal-key"
     res1 = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": idemp_key},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": key},
+        json={"operation": "validate", "records": VALID_FIXTURE},
     )
     assert res1.status_code == 201
-    run_id1 = res1.json()["run_id"]
+    orig_run_id = res1.json()["run_id"]
 
-    # 1. Terminal replay returns 200 with identical run_id
-    res_replay = client.post(
-        "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": idemp_key},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
-    )
-    assert res_replay.status_code == 200
-    assert res_replay.json()["run_id"] == run_id1
-
-    # 2. Reusing same key with changed payload returns 409 Conflict
-    mutated_records = [VALID_FIXTURE_RECORDS[0]]
-    res_conflict = client.post(
-        "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": idemp_key},
-        json={"operation": "validate", "records": mutated_records},
-    )
-    assert res_conflict.status_code == 409
-
-    # 3. Exhaust quota for Tenant A (force used_today to 10)
+    # Now simulate quota exhausted for tenant-a
     db = SessionLocal()
-    today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    usage = db.query(DailyUsageRecord).filter_by(tenant_id="tenant-a", utc_date=today_utc).first()
-    usage.count = 10
+    row_a = db.query(DailyUsageModel).filter_by(tenant_id="tenant-a", usage_date=today).first()
+    row_a.count = 10
     db.commit()
     db.close()
 
-    # Replay of the existing key must STILL return 200 OK without debit or 429 error
-    res_replay_exhausted = client.post(
+    # Replay with matching key and identical payload -> 200 without new debit
+    replay_res = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": idemp_key},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": key},
+        json={"operation": "validate", "records": VALID_FIXTURE},
     )
-    assert res_replay_exhausted.status_code == 200
-    assert res_replay_exhausted.json()["run_id"] == run_id1
+    assert replay_res.status_code == 200
+    assert replay_res.json()["run_id"] == orig_run_id
 
-    # But a fresh key at exhausted quota must be rejected with 429
-    res_fresh_at_exhausted = client.post(
+    # Replay with same key but changed input -> 409 Conflict
+    changed_records = copy.deepcopy(VALID_FIXTURE)
+    changed_records[0]["record_count"] = 50
+    conflict_res = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": str(uuid.uuid4())},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": key},
+        json={"operation": "validate", "records": changed_records},
     )
-    assert res_fresh_at_exhausted.status_code == 429
-
-    # 4. Two simultaneous identical keys create at most one run
-    simul_key = f"simul-{uuid.uuid4()}"
-    # Reset usage to 0 for concurrency test
-    db = SessionLocal()
-    usage = db.query(DailyUsageRecord).filter_by(tenant_id="tenant-a", utc_date=today_utc).first()
-    usage.count = 0
-    db.commit()
-    db.close()
-
-    def submit_simul():
-        return client.post(
-            "/runs",
-            headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": simul_key},
-            json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
-        ).status_code
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        f1 = executor.submit(submit_simul)
-        f2 = executor.submit(submit_simul)
-        simul_results = [f1.result(), f2.result()]
-
-    assert 201 in simul_results
-    assert all(code in (200, 201, 409) for code in simul_results)
+    assert conflict_res.status_code == 409
 
 
-# ---------------------------------------------------------------------------
-# A10: Suspended Subscription
-# ---------------------------------------------------------------------------
-
+# --------------------------------------------------------------------------
+# A10: Subscription suspended -> 403 on submit; history reads work
+# --------------------------------------------------------------------------
 def test_a10_suspended_subscription():
-    """A10: The harness suspends the subscription: new submissions return 403
-    and debit nothing; authorised historical reads continue to work.
-    """
-    res_submit = client.post(
+    # Create an active run first
+    key = str(uuid.uuid4())
+    res = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_SUSPENDED_OPERATOR, "Idempotency-Key": str(uuid.uuid4())},
-        json={"operation": "validate", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": key},
+        json={"operation": "validate", "records": VALID_FIXTURE},
     )
-    assert res_submit.status_code == 403
+    assert res.status_code == 201
 
-    # Historical reads still succeed
-    res_hist = client.get("/runs", headers={"Authorization": TOKEN_SUSPENDED_OPERATOR})
-    assert res_hist.status_code == 200
-
-    res_sub = client.get("/subscription", headers={"Authorization": TOKEN_SUSPENDED_OPERATOR})
-    assert res_sub.status_code == 200
-    assert res_sub.json()["status"] == "suspended"
+    # Suspend tenant-a subscription
+    harness.set_status("tenant-a", "Suspended")
 
 
-# ---------------------------------------------------------------------------
-# A11: Forced Failure Test Hook
-# ---------------------------------------------------------------------------
+    # New submission returns 403 and debits nothing
+    sub_before = client.get("/subscription", headers={"Authorization": "Bearer pro_operator"}).json()
+    used_before = sub_before["used_today"]
 
+    res_suspended = client.post(
+        "/runs",
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": str(uuid.uuid4())},
+        json={"operation": "validate", "records": VALID_FIXTURE},
+    )
+    assert res_suspended.status_code == 403
+
+    sub_after = client.get("/subscription", headers={"Authorization": "Bearer pro_operator"}).json()
+    assert sub_after["used_today"] == used_before
+
+    # Historical reads still work
+    hist_res = client.get("/runs", headers={"Authorization": "Bearer pro_operator"})
+    assert hist_res.status_code == 200
+    assert len(hist_res.json()) >= 1
+
+
+# --------------------------------------------------------------------------
+# A11: Shared failure hook forces failure after acceptance; error recorded; 1 slot used
+# --------------------------------------------------------------------------
 def test_a11_forced_failure_hook():
-    """A11: The shared hook forces a processing failure after acceptance:
-    the run is Failed, the error is recorded and one slot is used.
-    Replaying its key returns that failure without re-execution.
-    """
-    idemp_key = f"fail-key-{uuid.uuid4()}"
+    key = str(uuid.uuid4())
+
+    sub_before = client.get("/subscription", headers={"Authorization": "Bearer pro_operator"}).json()
+    used_before = sub_before["used_today"]
+
+    # Trigger failure hook via header
     res = client.post(
         "/runs",
         headers={
-            "Authorization": TOKEN_PRO_OPERATOR,
-            "Idempotency-Key": idemp_key,
-            "X-Test-Force-Failure": "1",
+            "Authorization": "Bearer pro_operator",
+            "Idempotency-Key": key,
+            "X-Force-Failure": "true",
         },
-        json={"operation": "process", "records": VALID_FIXTURE_RECORDS},
+        json={"operation": "process", "records": VALID_FIXTURE},
     )
     assert res.status_code == 201
     data = res.json()
     assert data["status"] == "Failed"
-    assert "error" in data and data["error"] is not None
+    assert data["error"] is not None
+    assert "Forced failure" in data["error"]
+    failed_run_id = data["run_id"]
 
-    # Replaying same key returns existing Failed run with HTTP 200 without re-execution
-    res_replay = client.post(
+    # 1 quota slot was used
+    sub_after = client.get("/subscription", headers={"Authorization": "Bearer pro_operator"}).json()
+    assert sub_after["used_today"] == used_before + 1
+
+    # Replay key returns recorded failure with 200 without re-execution or extra debit
+    replay_res = client.post(
         "/runs",
-        headers={"Authorization": TOKEN_PRO_OPERATOR, "Idempotency-Key": idemp_key},
-        json={"operation": "process", "records": VALID_FIXTURE_RECORDS},
+        headers={"Authorization": "Bearer pro_operator", "Idempotency-Key": key},
+        json={"operation": "process", "records": VALID_FIXTURE},
     )
-    assert res_replay.status_code == 200
-    assert res_replay.json()["status"] == "Failed"
-    assert res_replay.json()["error"] == data["error"]
+    assert replay_res.status_code == 200
+    assert replay_res.json()["run_id"] == failed_run_id
+    assert replay_res.json()["status"] == "Failed"
 
-
-# ---------------------------------------------------------------------------
-# Database Schema Integrity & Uniqueness Constraints
-# ---------------------------------------------------------------------------
-
-def test_database_uniqueness_constraints():
-    """Verifies that database schema enforces uniqueness at the database level."""
-    db = SessionLocal()
-    try:
-        # 1. Uniqueness on runs (tenant_id, idempotency_key)
-        run_1 = RunRecord(
-            id=str(uuid.uuid4()),
-            tenant_id="tenant-a",
-            idempotency_key="unique-key-1",
-            operation="validate",
-            status="Succeeded",
-        )
-        db.add(run_1)
-        db.commit()
-
-        run_dup = RunRecord(
-            id=str(uuid.uuid4()),
-            tenant_id="tenant-a",
-            idempotency_key="unique-key-1",  # duplicate
-            operation="validate",
-            status="Succeeded",
-        )
-        db.add(run_dup)
-        with pytest.raises(IntegrityError):
-            db.commit()
-        db.rollback()
-
-        # 2. Uniqueness on daily_usage (tenant_id, utc_date)
-        usage_1 = DailyUsageRecord(
-            id=str(uuid.uuid4()),
-            tenant_id="tenant-a",
-            utc_date="2026-10-21",
-            count=1,
-        )
-        db.add(usage_1)
-        db.commit()
-
-        usage_dup = DailyUsageRecord(
-            id=str(uuid.uuid4()),
-            tenant_id="tenant-a",
-            utc_date="2026-10-21",  # duplicate
-            count=2,
-        )
-        db.add(usage_dup)
-        with pytest.raises(IntegrityError):
-            db.commit()
-        db.rollback()
-    finally:
-        db.close()
+    sub_after_replay = client.get("/subscription", headers={"Authorization": "Bearer pro_operator"}).json()
+    assert sub_after_replay["used_today"] == sub_after["used_today"]

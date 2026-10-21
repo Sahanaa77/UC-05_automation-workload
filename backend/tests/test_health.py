@@ -1,54 +1,32 @@
-import pytest
+"""
+Health check tests for UC-05 Automation Workload Preview SaaS.
+Verifies GET /health is public, returns 200 {"status": "ok"}, and reveals no tenant data.
+"""
 from fastapi.testclient import TestClient
-
-from entitlesim.db import Base, engine, init_db
-from entitlesim.main import app
+from app.main import app
 
 client = TestClient(app)
 
 
-@pytest.fixture(autouse=True)
-def setup_database():
-    init_db()
-    yield
-
-
-def test_health_check_api():
-    response = client.get("/api/health")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ok"
-    assert data["version"] == "0.1.0"
-
-
-def test_health_check_root():
+def test_health_endpoint_public():
+    """GET /health must be public and return 200 with status ok."""
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+    data = response.json()
+    assert data == {"status": "ok"}
 
 
-def test_db_tables_created():
-    from sqlalchemy import inspect
-    inspector = inspect(engine)
-    table_names = inspector.get_table_names()
-    assert "models" in table_names
-    assert "runs" in table_names
-    assert "counterexamples" in table_names
-    assert "regression_tests" in table_names
-
-
-def test_models_validate_endpoint():
-    valid_model = {
-        "definition": {
-            "name": "test-model",
-            "tenants": [{"id": "A"}, {"id": "B"}],
-            "plans": {"free": {"features": ["basic"]}},
-            "invariants": [{"id": "INV-1", "type": "feature_access_matches_plan"}],
-            "scenario": [],
-        }
-    }
-    response = client.post("/api/models/validate", json=valid_model)
+def test_health_reveals_no_tenant_data():
+    """GET /health must reveal no tenant context, ids, or private data."""
+    response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["valid"] is True
-    assert "A" in data["summary"]["tenants"]
+    sensitive_keys = {"tenant", "tenant_id", "user", "user_id", "role", "plan", "quota", "secret"}
+    assert not any(key in data for key in sensitive_keys)
+
+
+def test_health_without_auth_header():
+    """GET /health must succeed without any Authorization header."""
+    response = client.get("/health", headers={})
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
