@@ -1,4 +1,3 @@
-
 # Python virtual environments
 .venv/
 venv/
@@ -15,50 +14,44 @@ node_modules/
 
 # Generated frontend build
 frontend/dist/
+dist/
 
-# Local database
+# Local databases
+*.db
 backend/entitlesim.db
+backend/workloadlens.db
 
 # Generated Python package metadata
+*.egg-info/
 backend/*.egg-info/
 
 # Secrets and local environment settings
 .env
 .env.*
 !.env.example
+*.pem
+*.key
 
 # Editor and operating system files
 .vscode/
+.idea/
 .DS_Store
 Thumbs.db
-
-<<<<<<< HEAD
-# Terraform
-*.tfstate
-*.tfstate.*
-.terraform/
-*.tfvars
-*.tfvars.json
-
-# Local sqlite database
-*.db
 
 # Local blob storage folder
 .blob_local/
 backend/.blob_local/
 **/.blob_local/
 
-# Python egg-info
-*.egg-info/
-
-=======
-# Terraform — never commit state or provider cache.
-# Local state files contain sensitive values (e.g. DATABASE_URL) in plaintext.
-infra/terraform.tfstate
-infra/terraform.tfstate.backup
+# Terraform — state, plans, locks, and provider cache
+*.tfstate
+*.tfstate.*
+.terraform/
 infra/.terraform/
+*.tfplan
 infra/tfplan*
 infra/*.tfplan
-infra/.terraform.tfstate.lock.info
+.terraform.lock.hcl
 infra/.terraform.lock.hcl
->>>>>>> dcf2a3258c585e3edc65fcfeb6627a460e394364
+infra/.terraform.tfstate.lock.info
+*.secret.tfvars
