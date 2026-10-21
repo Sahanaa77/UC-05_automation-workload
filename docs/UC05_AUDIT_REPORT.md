@@ -91,8 +91,8 @@ To complete check A12 in an independent session:
 
 1. **Clone & Setup**:
    ```bash
-   git clone https://github.com/Sahanaa77/uc05-Code-Sapiens.git
-   cd uc05-Code-Sapiens
+   git clone https://github.com/Sahanaa77/UC-05_automation-workload.git
+   cd UC-05_automation-workload
    git checkout feature/uc05-infra-docs
    ```
 2. **Execute Automated Verification Suite**:

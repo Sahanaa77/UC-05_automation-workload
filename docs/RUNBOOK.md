@@ -28,7 +28,7 @@ Ensure the following tools are installed on your workstation:
 ## 3. Project Structure
 
 ```text
-uc05-Code-Sapiens/
+UC-05_automation-workload/
 ├── backend/
 │   ├── entitlesim/
 │   │   ├── main.py                # FastAPI entrypoint & static route mounting

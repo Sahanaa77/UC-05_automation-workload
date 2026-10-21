@@ -1,7 +1,7 @@
 # WorkloadLens — Automation Workload Preview SaaS
 
-[![CI - Test & Build](https://github.com/Sahanaa77/uc05-Code-Sapiens/actions/workflows/ci.yml/badge.svg)](https://github.com/Sahanaa77/uc05-Code-Sapiens/actions/workflows/ci.yml)
-[![Build & Publish Container](https://github.com/Sahanaa77/uc05-Code-Sapiens/actions/workflows/build-image.yml/badge.svg)](https://github.com/Sahanaa77/uc05-Code-Sapiens/actions/workflows/build-image.yml)
+[![CI - Test & Build](https://github.com/Sahanaa77/UC-05_automation-workload/actions/workflows/ci.yml/badge.svg)](https://github.com/Sahanaa77/UC-05_automation-workload/actions/workflows/ci.yml)
+[![Build & Publish Container](https://github.com/Sahanaa77/UC-05_automation-workload/actions/workflows/build-image.yml/badge.svg)](https://github.com/Sahanaa77/UC-05_automation-workload/actions/workflows/build-image.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![React 19](https://img.shields.io/badge/react-19.0-61dafb.svg)](https://react.dev/)
 [![Tailwind v4](https://img.shields.io/badge/tailwind-v4.0-38bdf8.svg)](https://tailwindcss.com/)
@@ -9,14 +9,57 @@
 
 > **UC-05 | Cloud and SaaS Engineering Challenge | Revision 2**  
 > **Team:** Code Sapiens  
-> **Repository:** [`Sahanaa77/UC-05_automation-workload`](https://github.com/Sahanaa77/uc05-Code-Sapiens)  
+> **Repository:** [`Sahanaa77/UC-05_automation-workload`](https://github.com/Sahanaa77/UC-05_automation-workload)  
 > **Design Direction:** Contemporary Heritage (Restrained Editorial Typography, Deep Navy Foundation, Warm Neutral Surfaces, Antique Gold Accents)
-
-**WorkloadLens** is a multi-tenant Software-as-a-Service (SaaS) application that validates proposed automation jobs and generates estimated workload previews for eligible Pro subscribers. It enforces strict batch rules (R1–R4), guarantees cross-tenant isolation, provides atomic daily quota enforcement, and guarantees idempotent execution and history tracking across container cold restarts.
 
 ---
 
-## Live Website
+## 1. Project Overview
+
+**WorkloadLens** is a multi-tenant Software-as-a-Service (SaaS) application that validates proposed automation jobs and generates estimated workload previews for eligible Pro subscribers. It enforces strict batch validation rules (R1–R4), guarantees cross-tenant isolation, provides atomic daily quota enforcement, and guarantees idempotent execution and history tracking across container cold restarts.
+
+Built by **Team Code Sapiens** for the **UC-05 Automation Workload Preview SaaS** challenge, WorkloadLens operates as an enterprise preflight engine deployed on Microsoft Azure Container Apps, providing full lifecycle automation workload previewing.
+
+---
+
+## 2. Problem Statement and Objectives
+
+Enterprise automation pipelines frequently trigger high-cost downstream jobs without prior structural verification, causing database rollbacks, exhausted API quotas, and unpredictable execution latency.
+
+**WorkloadLens** solves this by acting as a zero-trust preflight gateway:
+1. **Validates** proposed automation job batches before execution against four strict rules (R1–R4).
+2. **Estimates** processing effort at a deterministic rate of **10 milliseconds per record** for Pro subscribers.
+3. **Protects** tenant boundaries, subscription limits, and daily usage quotas under concurrent load.
+4. **Guarantees** exactly-once execution semantics through deterministic SHA-256 idempotency fingerprinting.
+
+---
+
+## 3. Key Capabilities and UC-05 Requirements
+
+### Validation Rules (R1–R4)
+
+| Rule ID | Target Field | Requirement & Constraints |
+|:---:|---|---|
+| **R1** | `record_id` | Nonempty string, 1 to 20 characters, strictly unique within the batch. Case-sensitive. |
+| **R2** | `tool` | Allowed tool values: `EXPORT` or `VALIDATE`. |
+| **R3** | `record_count` | Integer from 1 through 1000. Booleans (`true`/`false`) and numeric strings (`"20"`) are invalid. |
+| **R4** | `environment` | Allowed execution environments: `TEST` or `STAGE`. Production (`PROD`) is prohibited. |
+
+*Notes:* Strings are trimmed before validation. Each invalid row is counted once even if it violates multiple rules. In `process` mode, any invalid row causes immediate rejection with `HTTP 400 Bad Request` and zero quota consumption.
+
+### SaaS Subscription Plans & Permissions
+
+| Feature / Operation | Basic Plan (`tenant-b`) | Pro Plan (`tenant-a`) | Suspended (`tenant-suspended`) |
+|---|:---:|:---:|:---:|
+| **Validate Operation** | Allowed | Allowed | Denied (`HTTP 403`) |
+| **Process Operation** | Denied (`HTTP 403`) | Allowed | Denied (`HTTP 403`) |
+| **Daily Quota Limit** | **3 accepted runs / UTC day** | **10 accepted runs / UTC day** | 0 new submissions |
+| **Historical Reads (`GET /runs`)** | Allowed | Allowed | Allowed (`HTTP 200`) |
+| **Viewer Role Submissions** | Denied (`HTTP 403`) | Denied (`HTTP 403`) | Denied (`HTTP 403`) |
+
+---
+
+## 4. Live Website
 
 [**Open WorkloadLens Web Application**](https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/)
 
@@ -26,7 +69,7 @@ The primary user-facing SaaS application deployed as a unified multi-stage conta
 
 ---
 
-## Live API
+## 5. Live API
 
 The backend REST API is hosted on the same production Azure Container App instance:
 
@@ -36,7 +79,7 @@ The backend REST API is hosted on the same production Azure Container App instan
 
 ---
 
-## Screenshots
+## 6. Screenshots
 
 The following authentic screenshots demonstrate the redesigned **Contemporary Heritage** interface captured directly at a consistent desktop viewport of **1440 × 900** using headless Microsoft Edge:
 
@@ -76,19 +119,7 @@ The following authentic screenshots demonstrate the redesigned **Contemporary He
 
 ---
 
-## Problem Statement & Operational Scope
-
-Enterprise automation pipelines frequently trigger high-cost downstream jobs without prior structural verification, causing database rollbacks, exhausted API quotas, and unpredictable execution latency.
-
-**WorkloadLens** solves this by acting as a zero-trust preflight gateway:
-1. **Validates** proposed automation job batches before execution against 4 strict rules (R1–R4).
-2. **Estimates** processing effort at a deterministic rate of **10 milliseconds per record**.
-3. **Protects** tenant boundaries, subscription limits, and daily usage quotas under concurrent load.
-4. **Guarantees** exactly-once execution semantics through deterministic SHA-256 idempotency fingerprinting.
-
----
-
-## System Architecture
+## 7. System Architecture
 
 ```mermaid
 graph TD
@@ -128,32 +159,58 @@ graph TD
 
 ---
 
-## Validation Rules (R1–R4)
+## 8. Technology Stack
 
-| Rule ID | Target Field | Requirement & Constraints |
-|:---:|---|---|
-| **R1** | `record_id` | Nonempty string, 1 to 20 characters, strictly unique within the batch. Case-sensitive. |
-| **R2** | `tool` | Allowed tool values: `EXPORT` or `VALIDATE`. |
-| **R3** | `record_count` | Integer from 1 through 1000. Booleans (`true`/`false`) and numeric strings (`"20"`) are invalid. |
-| **R4** | `environment` | Allowed execution environments: `TEST` or `STAGE`. Production (`PROD`) is prohibited. |
-
-*Notes:* Strings are trimmed before validation. Each invalid row is counted once even if it violates multiple rules. In `process` mode, any invalid row causes immediate rejection with `HTTP 400 Bad Request` and zero quota consumption.
-
----
-
-## SaaS Subscription Plans & Permissions
-
-| Feature / Operation | Basic Plan (`tenant-b`) | Pro Plan (`tenant-a`) | Suspended (`tenant-suspended`) |
-|---|:---:|:---:|:---:|
-| **Validate Operation** | Allowed | Allowed | Denied (`HTTP 403`) |
-| **Process Operation** | Denied (`HTTP 403`) | Allowed | Denied (`HTTP 403`) |
-| **Daily Quota Limit** | **3 accepted runs / UTC day** | **10 accepted runs / UTC day** | 0 new submissions |
-| **Historical Reads (`GET /runs`)** | Allowed | Allowed | Allowed (`HTTP 200`) |
-| **Viewer Role Submissions** | Denied (`HTTP 403`) | Denied (`HTTP 403`) | Denied (`HTTP 403`) |
+| Domain | Technology | Version | Purpose & Rationale |
+|---|---|---|---|
+| **Backend Runtime** | Python | 3.11+ / 3.12 | Strongly typed asynchronous backend execution. |
+| **Web Framework** | FastAPI | 0.115+ | High-performance asynchronous REST API with automatic OpenAPI validation. |
+| **Data Persistence** | SQLAlchemy + SQLite / PostgreSQL | 2.0+ | Relational mapping, ACID transaction boundaries, and conditional atomic upserts. |
+| **Data Validation** | Pydantic | v2 | Strict schema parsing and type coercion prevention. |
+| **Testing** | Pytest | 8.x | Comprehensive test harness covering unit, integration, and concurrency scenarios. |
+| **Frontend Framework** | React | 19.0 | Component-driven user interface with hooks and strict state encapsulation. |
+| **Type Safety** | TypeScript | 5.5+ | Full client-side typing across models, API responses, and route definitions. |
+| **Bundler & Tooling** | Vite | 6.x | Fast ESM module bundling, Hot Module Replacement, and optimized production builds. |
+| **Styling** | Tailwind CSS | v4.0 | Utility-first styling implementing Contemporary Heritage design tokens. |
+| **UI Icons** | Lucide React | 1.x | Lightweight, accessible iconography. |
+| **Visual Charts** | Recharts | 2.x | Responsive SVG metric and quota visualizations. |
+| **Cloud Hosting** | Azure Container Apps | Linux / Consumption | Serverless container runtime with dynamic scaling and HTTPS ingress. |
+| **Container Registry** | Azure Container Registry (ACR) | Basic SKU | Secure private container image distribution. |
+| **Blob Storage** | Azure Blob Storage | Hot Tier | Cloud-persisted run execution payloads and simulation artifacts. |
+| **IaC** | Terraform | 1.6+ | Declarative, idempotent provisioning of the two required Azure cloud resources. |
 
 ---
 
-## API Reference
+## 9. Setup and Execution Instructions
+
+### Prerequisites
+* **Python:** 3.11 or higher
+* **Node.js:** 20 or higher
+* **Terraform:** 1.6+ (for infrastructure verification)
+
+### Quick Start
+```bash
+# 1. Clone repository
+git clone https://github.com/Sahanaa77/UC-05_automation-workload.git
+cd UC-05_automation-workload
+
+# 2. Setup backend virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -e "backend[dev]"
+
+# 3. Setup frontend dependencies
+cd frontend
+npm install
+cd ..
+
+# 4. Start local development server (Unified SPA + API)
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --app-dir backend
+```
+
+---
+
+## 10. API Endpoints and Expected Behavior
 
 All protected endpoints require an `Authorization: Bearer <token>` header. Tenant identifiers are **never** accepted in query parameters or request bodies.
 
@@ -226,36 +283,7 @@ All protected endpoints require an `Authorization: Bearer <token>` header. Tenan
 
 ---
 
-## Local Development & Setup
-
-### Prerequisites
-* **Python:** 3.11 or higher
-* **Node.js:** 20 or higher
-* **Terraform:** 1.6+ (for infrastructure verification)
-
-### Quick Start
-```bash
-# 1. Clone repository
-git clone https://github.com/Sahanaa77/uc05-Code-Sapiens.git
-cd uc05-Code-Sapiens
-
-# 2. Setup backend virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -e "backend[dev]"
-
-# 3. Setup frontend dependencies
-cd frontend
-npm install
-cd ..
-
-# 4. Start local development server (Unified SPA + API)
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --app-dir backend
-```
-
----
-
-## Verification & Test Commands
+## 11. Testing and Verification
 
 ### 1. Backend Test Suite (63 Tests)
 ```bash
@@ -278,7 +306,7 @@ terraform -chdir=infra validate
 
 ---
 
-## Acceptance Checks Matrix (A01–A12)
+## 12. Acceptance Criteria and Evidence
 
 All twelve official acceptance checks are fully verified:
 
@@ -301,34 +329,54 @@ See [`docs/architecture/acceptance-matrix.md`](docs/architecture/acceptance-matr
 
 ---
 
-## References and Design Rationale
+## 13. References and Design Rationale
 
-WorkloadLens draws upon established engineering guidance in software architecture, multitenant cloud design, formal HTTP semantics, and infrastructure-as-code standards. Core architectural mechanisms—including pure-function batch rule validation, atomic quota reservations via conditional SQL updates, strict cryptographically derived tenant boundaries, application-level idempotency replays, and bounded Terraform infrastructure—are grounded in verified industry references.
+WorkloadLens draws upon established engineering guidance in software architecture, multitenant cloud design, formal HTTP semantics, and infrastructure-as-code standards. Core architectural mechanisms—including pure-function batch rule validation, atomic quota reservations via conditional SQL updates, strict cryptographically derived tenant boundaries, application-level idempotency replays, and bounded Terraform infrastructure—are grounded in verified industry references:
+
+* **Martin Fowler et al., *Patterns of Enterprise Application Architecture* (2002):** Separates pure validation logic from state mutations; informs the Unit of Work and Service Layer isolation.
+* **Martin Kleppmann, *Designing Data-Intensive Applications* (2017):** Single-statement conditional SQL updates (`UPDATE ... WHERE used_today < daily_quota`) ensuring atomic quota reservation without race conditions.
+* **Microsoft Azure Architecture Center, *SaaS and Multitenant Solution Architecture*:** Cryptographic tenant boundary enforcement derived exclusively from verified JWT identity.
+* **IETF, *RFC 9110: HTTP Semantics* (Section 9.2.2):** Safe and idempotent request-replay semantics via client-supplied `Idempotency-Key` headers.
+* **HashiCorp, *Terraform Recommended Practices*:** Strict declarative infrastructure bounded to exactly two cloud resources.
 
 For complete citations, conceptual summaries, verified application mappings, and explicit project boundaries, see [`docs/architecture/references.md`](docs/architecture/references.md).
 
 ---
 
-## Technical Documentation Sitemap
+## 14. Team and Contributions
+
+WorkloadLens was engineered, tested, verified, and deployed by **Team Code Sapiens** for the **UC-05 Automation Workload Preview SaaS** challenge (Cloud & SaaS Engineering Challenges, Revision 2).
+
+### Poojhaa K — Team Lead
+* **Leadership & Project Coordination:** Served as Team Lead, overseeing project milestones, task distribution, delivery schedules, and team synchronization across all phases of work.
+* **Requirements & Compliance Oversight:** Directed team alignment with the official UC-05 specification and acceptance criteria (A01–A12), ensuring complete coverage of validation rules, tenant isolation models, and quota requirements.
+
+### Rohita — Documentation, Testing, and Deployment
+* **Documentation:** Authored and enhanced comprehensive project documentation, including high-level architecture designs, sequence workflows, data models, operational runbooks, and repository guides.
+* **Testing and Verification:** Contributed to validating application behavior against specifications, implementing and executing backend test suites (63 tests), verifying concurrency race condition protections, and auditing the A01–A12 compliance evidence matrix.
+* **Deployment:** Contributed to cloud deployment activities on Microsoft Azure, configuring multi-stage container workflows, verifying container registry publication, validating live API and web endpoints, and coordinating post-deployment sanity checks.
+
+### Sahanaa — Team Member and Repository Owner
+* **Repository Management:** Served as repository owner, establishing the project structure, governing branch policies, conducting pull request reviews, and integrating code across branches.
+* **Full-Stack Implementation:** Contributed to application implementation across frontend and backend services, including simulation logic, UI component structuring, and baseline UC-05 feature capabilities.
+
+### Team Code Sapiens Acknowledgement
+Team Code Sapiens collaboratively developed WorkloadLens to demonstrate production-grade cloud SaaS engineering, resilient multitenancy, robust concurrency controls, and high-fidelity user experience for automated workload validation.
+
+---
+
+## 15. Technical Documentation Sitemap
 
 * [`docs/architecture/high-level-architecture.md`](docs/architecture/high-level-architecture.md): Complete cloud and application architectural overview.
 * [`docs/architecture/sequence-diagrams.md`](docs/architecture/sequence-diagrams.md): Six Mermaid sequence diagrams for all key operational workflows.
 * [`docs/architecture/data-model.md`](docs/architecture/data-model.md): Detailed SQL schema, constraints, and ER diagram.
 * [`docs/architecture/acceptance-matrix.md`](docs/architecture/acceptance-matrix.md): Traceable A01–A12 compliance audit with evidence links.
 * [`docs/architecture/references.md`](docs/architecture/references.md): Industry references, design rationale, and project scope boundaries.
-* [`skills/automation-preview/SKILL.md`](skills/automation-preview/SKILL.md): Operational runbook and deployment guide.
+* [`docs/RUNBOOK.md`](docs/RUNBOOK.md): Operational runbook and deployment troubleshooting.
+* [`docs/UC05_AUDIT_REPORT.md`](docs/UC05_AUDIT_REPORT.md): Acceptance audit report and teammate replay checklist.
 
 ---
 
-## Team & Attribution
+## 16. AI Assistance Disclosure
 
-* **Team:** Code Sapiens
-* **Challenge:** Cloud & SaaS Engineering Challenges — Revision 2
-* **Use Case:** UC-05 Automation Workload Preview SaaS
-* **Canonical Repository:** [`Sahanaa77/UC-05_automation-workload`](https://github.com/Sahanaa77/uc05-Code-Sapiens)
-
----
-
-## AI Assistance Disclosure
-
-Portions of the code formatting, test harness assertions, technical diagrams, and documentation were assisted by Google DeepMind Antigravity AI pair programming tools. All business logic, tenant isolation constraints, quota race condition handling, and acceptance verifications have been independently reviewed, tested, and validated against the official UC-05 specification.
+Portions of code formatting, test harness assertions, technical diagrams, and documentation were assisted by Google DeepMind Antigravity AI pair programming tools. All business logic, tenant isolation constraints, quota race condition handling, and acceptance verifications have been independently reviewed, tested, and validated by the team against the official UC-05 specification.
