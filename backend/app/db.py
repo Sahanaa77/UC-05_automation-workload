@@ -3,11 +3,14 @@ Database connection and session factory for UC-05 SaaS.
 Defaults to SQLite fallback if DATABASE_URL is not set or empty.
 """
 import os
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from app.models import Base
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./automation_preview.db")
+# Anchor default SQLite location canonically to project root so different CWDs share the same DB
+_default_db = Path(__file__).resolve().parent.parent.parent / "automation_preview.db"
+DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{_default_db.as_posix()}"
 
 # SQLite needs check_same_thread=False
 connect_args = {}

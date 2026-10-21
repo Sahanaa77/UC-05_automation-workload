@@ -13,7 +13,7 @@ export interface DevTokenOption {
 
 export const DEV_TOKENS: DevTokenOption[] = [
   {
-    token: 'dev-token-a-operator',
+    token: 'token-tenant-a-operator',
     label: 'Tenant A Operator (Pro - Active)',
     tenant: 'Tenant A',
     role: 'Operator',
@@ -21,7 +21,7 @@ export const DEV_TOKENS: DevTokenOption[] = [
     status: 'Active',
   },
   {
-    token: 'dev-token-a-viewer',
+    token: 'token-tenant-a-viewer',
     label: 'Tenant A Viewer (Pro - Read-only)',
     tenant: 'Tenant A',
     role: 'Viewer',
@@ -29,7 +29,7 @@ export const DEV_TOKENS: DevTokenOption[] = [
     status: 'Active',
   },
   {
-    token: 'dev-token-b-operator',
+    token: 'token-tenant-b-operator',
     label: 'Tenant B Operator (Basic - Active)',
     tenant: 'Tenant B',
     role: 'Operator',
@@ -37,7 +37,15 @@ export const DEV_TOKENS: DevTokenOption[] = [
     status: 'Active',
   },
   {
-    token: 'suspended_operator',
+    token: 'token-tenant-b-viewer',
+    label: 'Tenant B Viewer (Basic - Read-only)',
+    tenant: 'Tenant B',
+    role: 'Viewer',
+    plan: 'Basic',
+    status: 'Active',
+  },
+  {
+    token: 'token-tenant-suspended-operator',
     label: 'Tenant Suspended (Pro - Suspended)',
     tenant: 'Tenant Suspended',
     role: 'Operator',
@@ -66,7 +74,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true)
 
   const activeTokenOption =
-    DEV_TOKENS.find((t) => t.token === token) || DEV_TOKENS[0]
+    DEV_TOKENS.find((t) => t.token === token) ||
+    DEV_TOKENS.find((t) => t.token.includes(token.replace('dev-', ''))) ||
+    DEV_TOKENS[0]
 
   const fetchAuthData = useCallback(async (authToken: string) => {
     setIsAuthLoading(true)

@@ -10,9 +10,9 @@ const API_BASE = '/api'
 
 let currentToken = (() => {
   try {
-    return localStorage.getItem('workloadlens-token') || 'dev-token-a-operator'
+    return localStorage.getItem('workloadlens-token') || 'token-tenant-a-operator'
   } catch {
-    return 'dev-token-a-operator'
+    return 'token-tenant-a-operator'
   }
 })()
 

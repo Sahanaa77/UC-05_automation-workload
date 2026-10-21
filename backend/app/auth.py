@@ -20,11 +20,17 @@ class UserIdentity(NamedTuple):
     role: str       # "Operator" | "Viewer"
 
 
-# Seeded users for dev and evaluation
-# Tenant A (Pro, Active) with operator + viewer users
-# Tenant B (Basic, Active) with operator user
-SEEDED_USERS = {
-    # Tenant A
+# Organizer-provided competition evaluation identities (permitted for evaluation in cloud and local)
+COMPETITION_EVALUATION_USERS = {
+    "token-tenant-a-operator": UserIdentity("user-a-op", "tenant-a", "Operator"),
+    "token-tenant-a-viewer": UserIdentity("user-a-vw", "tenant-a", "Viewer"),
+    "token-tenant-b-operator": UserIdentity("user-b-op", "tenant-b", "Operator"),
+    "token-tenant-b-viewer": UserIdentity("user-b-vw", "tenant-b", "Viewer"),
+    "token-tenant-suspended-operator": UserIdentity("user-s-op", "tenant-suspended", "Operator"),
+}
+
+# Local-only development and test harness identities (strictly gated by TEST_MODE=1)
+DEV_HARNESS_USERS = {
     "dev-token-a-operator": UserIdentity("user-a-op", "tenant-a", "Operator"),
     "dev-token-a-viewer": UserIdentity("user-a-vw", "tenant-a", "Viewer"),
     "pro_operator": UserIdentity("user-a-op", "tenant-a", "Operator"),
@@ -32,16 +38,17 @@ SEEDED_USERS = {
     "tenant-a-operator": UserIdentity("user-a-op", "tenant-a", "Operator"),
     "tenant-a-viewer": UserIdentity("user-a-vw", "tenant-a", "Viewer"),
 
-    # Tenant B
     "dev-token-b-operator": UserIdentity("user-b-op", "tenant-b", "Operator"),
     "basic_operator": UserIdentity("user-b-op", "tenant-b", "Operator"),
     "basic_viewer": UserIdentity("user-b-vw", "tenant-b", "Viewer"),
     "tenant-b-operator": UserIdentity("user-b-op", "tenant-b", "Operator"),
     "tenant_b_operator": UserIdentity("user-b-op", "tenant-b", "Operator"),
 
-    # Suspended mock
     "suspended_operator": UserIdentity("user-s-op", "tenant-suspended", "Operator"),
 }
+
+# Backwards-compatible union for references that import SEEDED_USERS
+SEEDED_USERS = {**DEV_HARNESS_USERS, **COMPETITION_EVALUATION_USERS}
 
 
 def seed_subscriptions() -> None:
@@ -50,7 +57,6 @@ def seed_subscriptions() -> None:
     db = SessionLocal()
     try:
         # Tenant A: Pro, Active
-
         sub_a = db.query(SubscriptionModel).filter_by(tenant_id="tenant-a").first()
         if not sub_a:
             db.add(SubscriptionModel(tenant_id="tenant-a", plan="Pro", status="Active"))
@@ -101,21 +107,26 @@ async def get_identity(request: Request) -> UserIdentity:
     # STAND-IN - replaced by organizer middleware before real deployment
     test_mode = os.getenv("TEST_MODE", "0") == "1"
 
-    identity = SEEDED_USERS.get(token) or SEEDED_USERS.get(token.lower())
-    if not identity:
-        # Support colon-formatted token: "<tenant_id>:<role>"
-        if ":" in token:
-            if not test_mode:
-                raise HTTPException(status_code=401, detail="Colon tokens only accepted when TEST_MODE=1")
-            parts = token.split(":")
-            identity = UserIdentity(user_id=f"user-{parts[0]}", tenant_id=parts[0], role=parts[1])
-        else:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    else:
+    # 1. Organizer competition evaluation identities are accepted in both evaluation and test mode
+    identity = COMPETITION_EVALUATION_USERS.get(token) or COMPETITION_EVALUATION_USERS.get(token.lower())
+    if identity:
+        return identity
+
+    # 2. Local development and test harness identities require TEST_MODE=1
+    identity = DEV_HARNESS_USERS.get(token) or DEV_HARNESS_USERS.get(token.lower())
+    if identity:
         if not test_mode:
             raise HTTPException(status_code=401, detail="Dev tokens only accepted when TEST_MODE=1")
+        return identity
 
-    return identity
+    # 3. Colon-formatted token: "<tenant_id>:<role>" (strictly in TEST_MODE=1)
+    if ":" in token:
+        if not test_mode:
+            raise HTTPException(status_code=401, detail="Colon tokens only accepted when TEST_MODE=1")
+        parts = token.split(":")
+        return UserIdentity(user_id=f"user-{parts[0]}", tenant_id=parts[0], role=parts[1])
+
+    raise HTTPException(status_code=401, detail="Invalid token")
 
 
 @dataclass(frozen=True)

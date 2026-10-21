@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, update, text
 from sqlalchemy.exc import IntegrityError
 
-from app.db import init_db, get_db, engine, SessionLocal
+from app.db import init_db, get_db, engine, SessionLocal, DATABASE_URL
 from app.models import RunModel, DailyUsageModel, SubscriptionModel
 
 from app.schemas import (
@@ -44,7 +44,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 # Read configuration from environment variables
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./automation_preview.db")
+# DATABASE_URL imported from app.db
 TEST_MODE = os.getenv("TEST_MODE", "0")
 BLOB_ACCOUNT_URL = os.getenv("BLOB_ACCOUNT_URL", "")
 BLOB_CONTAINER = os.getenv("BLOB_CONTAINER", "")

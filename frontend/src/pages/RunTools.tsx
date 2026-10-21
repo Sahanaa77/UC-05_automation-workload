@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   UC05JobRecord,
   UC05Subscription,
@@ -302,6 +303,7 @@ const RequestTimelineStrip: React.FC<RequestTimelineStripProps> = ({
 export const RunTools: React.FC = () => {
   const { token, activeTokenOption } = useAuth()
   const { toast } = useToast()
+  const navigate = useNavigate()
   const [subscription, setSubscription] = useState<UC05Subscription | null>(null)
   const [toolsData, setToolsData] = useState<ToolsApiResponse | null>(null)
   const [statsLoading, setStatsLoading] = useState<boolean>(false)
@@ -1837,7 +1839,7 @@ export const RunTools: React.FC = () => {
               <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <label className="text-[13px] font-semibold text-slate-600 dark:text-slate-400">
-                    Idempotency-Key
+                    Client Idempotency-Key (Client Generated, Not Server Run ID)
                   </label>
                   <label className="flex items-center gap-1 text-[13px] text-slate-500 dark:text-slate-400 cursor-pointer">
                     <input
@@ -2058,6 +2060,42 @@ export const RunTools: React.FC = () => {
                 )}
 
 
+
+                {lastRun?.run_id && (
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-xs shadow-2xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">Server-Assigned Run ID:</span>
+                      <code className="font-mono text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-900 px-2 py-1 rounded border border-indigo-200 dark:border-indigo-800 font-bold select-all">
+                        {lastRun.run_id}
+                      </code>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigator.clipboard.writeText(lastRun.run_id)
+                          toast('Run ID copied', lastRun.run_id, 'info')
+                        }}
+                        className="text-xs gap-1"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        Copy
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={() => navigate(`/history?search=${lastRun.run_id}`)}
+                        className="text-xs gap-1"
+                      >
+                        View in History →
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Succeeded Result View */}
                 {lastRun && lastRun.status === 'Succeeded' && lastRun.result && (

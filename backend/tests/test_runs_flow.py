@@ -313,3 +313,111 @@ def test_forced_failure_lifecycle():
 
     sub_final = client.get("/subscription", headers={"Authorization": "Bearer dev-token-a-operator"}).json()
     assert sub_final["used_today"] == sub_after["used_today"]
+
+
+# --------------------------------------------------------------------------
+# 10. History retrieval & cross-tenant isolation regression tests
+# --------------------------------------------------------------------------
+def test_history_retrieval_and_cross_tenant_isolation():
+    key = str(uuid.uuid4())
+    res = client.post(
+        "/runs",
+        headers={"Authorization": "Bearer token-tenant-a-operator", "Idempotency-Key": key},
+        json={"operation": "validate", "records": VALID_FIXTURE},
+    )
+    assert res.status_code == 201
+    run_id = res.json()["run_id"]
+
+    # Same tenant lists runs -> includes new run
+    runs_a = client.get("/runs", headers={"Authorization": "Bearer token-tenant-a-operator"}).json()
+    assert any(r["run_id"] == run_id for r in runs_a)
+
+    # Different tenant lists runs -> does NOT include run_id
+    runs_b = client.get("/runs", headers={"Authorization": "Bearer token-tenant-b-operator"}).json()
+    assert all(r["run_id"] != run_id for r in runs_b)
+
+    # Cross-tenant result lookup -> 404
+    fetch_b = client.get(f"/runs/{run_id}/result", headers={"Authorization": "Bearer token-tenant-b-operator"})
+    assert fetch_b.status_code == 404
+
+    # Same-tenant result lookup -> 200
+    fetch_a = client.get(f"/runs/{run_id}/result", headers={"Authorization": "Bearer token-tenant-a-operator"})
+    assert fetch_a.status_code == 200
+    assert fetch_a.json()["run_id"] == run_id
+
+
+def test_history_replay_same_key_no_duplicate_no_quota_debit():
+    key = str(uuid.uuid4())
+    res1 = client.post(
+        "/runs",
+        headers={"Authorization": "Bearer token-tenant-a-operator", "Idempotency-Key": key},
+        json={"operation": "validate", "records": VALID_FIXTURE},
+    )
+    assert res1.status_code == 201
+    run_id1 = res1.json()["run_id"]
+
+    sub_after1 = client.get("/subscription", headers={"Authorization": "Bearer token-tenant-a-operator"}).json()
+    used_after1 = sub_after1["used_today"]
+
+    # Replay with same key and same payload
+    res2 = client.post(
+        "/runs",
+        headers={"Authorization": "Bearer token-tenant-a-operator", "Idempotency-Key": key},
+        json={"operation": "validate", "records": VALID_FIXTURE},
+    )
+    assert res2.status_code == 200
+    assert res2.json()["run_id"] == run_id1
+
+    # Verify quota did not change
+    sub_after2 = client.get("/subscription", headers={"Authorization": "Bearer token-tenant-a-operator"}).json()
+    assert sub_after2["used_today"] == used_after1
+
+    # Verify exactly one row in history for this run
+    runs_a = client.get("/runs", headers={"Authorization": "Bearer token-tenant-a-operator"}).json()
+    matching_runs = [r for r in runs_a if r["run_id"] == run_id1]
+    assert len(matching_runs) == 1
+
+
+def test_persistence_across_cold_restart():
+    key = str(uuid.uuid4())
+    res = client.post(
+        "/runs",
+        headers={"Authorization": "Bearer token-tenant-a-operator", "Idempotency-Key": key},
+        json={"operation": "process", "records": VALID_FIXTURE},
+    )
+    assert res.status_code == 201
+    run_id = res.json()["run_id"]
+    result_data = res.json()["result"]
+
+    # Simulate restart by creating a new TestClient with fresh connection
+    new_client = TestClient(app)
+    get_res = new_client.get("/runs", headers={"Authorization": "Bearer token-tenant-a-operator"})
+    assert get_res.status_code == 200
+    runs = get_res.json()
+    assert any(r["run_id"] == run_id for r in runs)
+
+    # Result retrieval across restart boundary
+    result_res = new_client.get(f"/runs/{run_id}/result", headers={"Authorization": "Bearer token-tenant-a-operator"})
+    assert result_res.status_code == 200
+    assert result_res.json()["result"] == result_data
+
+
+def test_competition_evaluation_tokens_accepted():
+    # Verify that organizer-provided competition evaluation identities work properly
+    res_a = client.get("/subscription", headers={"Authorization": "Bearer token-tenant-a-operator"})
+    assert res_a.status_code == 200
+    assert res_a.json()["tenant_id"] == "tenant-a"
+    assert res_a.json()["plan"] == "Pro"
+
+    res_b = client.get("/subscription", headers={"Authorization": "Bearer token-tenant-b-operator"})
+    assert res_b.status_code == 200
+    assert res_b.json()["tenant_id"] == "tenant-b"
+    assert res_b.json()["plan"] == "Basic"
+
+    # Viewer role check
+    viewer_submit = client.post(
+        "/runs",
+        headers={"Authorization": "Bearer token-tenant-a-viewer", "Idempotency-Key": str(uuid.uuid4())},
+        json={"operation": "validate", "records": VALID_FIXTURE},
+    )
+    assert viewer_submit.status_code == 403

@@ -325,7 +325,14 @@ export const WorkloadHistory: React.FC = () => {
   // Filters synced to URL hash query parameters
   const statusFilter = searchParams.get('status') || 'All'
   const operationFilter = searchParams.get('operation') || 'All'
-  const [searchId, setSearchId] = useState<string>('')
+  const [searchId, setSearchId] = useState<string>(() => searchParams.get('search') || '')
+
+  useEffect(() => {
+    const q = searchParams.get('search')
+    if (q !== null && q !== searchId) {
+      setSearchId(q)
+    }
+  }, [searchParams])
 
   // Pagination state (10 per page)
   const [currentPage, setCurrentPage] = useState<number>(1)
@@ -619,13 +626,18 @@ export const WorkloadHistory: React.FC = () => {
   // Filtered runs
   const filteredRuns = useMemo(() => {
     return runs.filter((r) => {
-      if (statusFilter !== 'All' && r.status.toLowerCase() !== statusFilter.toLowerCase()) {
+      if (!r) return false
+      const rStatus = (r.status || '').toLowerCase()
+      const rOp = (r.operation || '').toLowerCase()
+      const rId = (r.run_id || '').toLowerCase()
+
+      if (statusFilter !== 'All' && rStatus !== statusFilter.toLowerCase()) {
         return false
       }
-      if (operationFilter !== 'All' && r.operation.toLowerCase() !== operationFilter.toLowerCase()) {
+      if (operationFilter !== 'All' && rOp !== operationFilter.toLowerCase()) {
         return false
       }
-      if (searchId.trim() && !r.run_id.toLowerCase().includes(searchId.trim().toLowerCase())) {
+      if (searchId.trim() && !rId.includes(searchId.trim().toLowerCase())) {
         return false
       }
       return true
@@ -1078,10 +1090,14 @@ export const WorkloadHistory: React.FC = () => {
           <div className="p-8">
             <EmptyState
               icon={<History className="w-6 h-6" />}
-              title={runs.length === 0 ? 'No workload runs found' : 'No matching runs'}
+              title={
+                runs.length === 0
+                  ? `No workload runs for ${activeTokenOption.tenant}`
+                  : 'No matching runs'
+              }
               description={
                 runs.length === 0
-                  ? 'No runs recorded for this tenant yet. Execute a workload in the Run Tools tab.'
+                  ? `No execution runs recorded for ${activeTokenOption.tenant} yet. Switch identity or execute a batch in the Run Tools tab.`
                   : 'No runs matched your current search and filter criteria.'
               }
               action={
@@ -1093,7 +1109,15 @@ export const WorkloadHistory: React.FC = () => {
                   >
                     Clear Filters
                   </Button>
-                ) : undefined
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => navigate('/tools')}
+                  >
+                    Go to Run Tools →
+                  </Button>
+                )
               }
             />
           </div>
