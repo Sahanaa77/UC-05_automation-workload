@@ -1,0 +1,45 @@
+name: Bug Report
+description: Create a bug report to help improve WorkloadLens
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting an issue! Please provide detailed reproduction steps.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Exact steps or API request payloads to reproduce the issue.
+      placeholder: |
+        1. POST /runs with payload ...
+        2. Set header Authorization: Bearer ...
+        3. Observed response ...
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen per the UC-05 specification.
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      options:
+        - Backend API (/runs, /tools, /subscription, /health)
+        - Frontend UI (Run Tools, History)
+        - Quota & Idempotency Engine
+        - Authentication & Tenant Isolation
+        - Terraform & Azure Deployment
+    validations:
+      required: true

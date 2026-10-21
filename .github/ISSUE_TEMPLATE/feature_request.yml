@@ -1,0 +1,32 @@
+name: Feature Request
+description: Suggest an idea or enhancement for WorkloadLens
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for proposing an enhancement to WorkloadLens!
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Please describe clearly.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see implemented.
+    validations:
+      required: true
+  - type: dropdown
+    id: boundary
+    attributes:
+      label: UC-05 Scope Alignment
+      description: Does this proposal maintain strict 2-screen architecture and tenant isolation?
+      options:
+        - Yes — adheres strictly to UC-05 requirements
+        - Internal enhancement (testing, tooling, CI)
+    validations:
+      required: true
