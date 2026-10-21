@@ -308,7 +308,7 @@ terraform -chdir=infra validate
 
 ## 12. Acceptance Criteria and Evidence
 
-A01–A11 automated and live cloud checks are fully verified (**PASS**); A12 is documented and prepared for independent teammate evaluation:
+All twelve official acceptance checks (A01–A12) are fully verified (**PASS**):
 
 | Check | Description | Verification Scope | Status |
 |:---:|---|---|:---:|
@@ -323,7 +323,7 @@ A01–A11 automated and live cloud checks are fully verified (**PASS**); A12 is 
 | **A09** | Idempotency replay returns 200 with 0 quota debit; changed payload returns 409 | Live Cloud + Pytest | **PASS** |
 | **A10** | Suspended subscription rejects new runs (403); historical reads permitted | Live Cloud + Pytest | **PASS** |
 | **A11** | Processing failure hook sets Failed status, consumes 1 slot, replay returns Failed | Local Pytest + Cloud | **PASS** |
-| **A12** | Fresh-session independent evaluation via `skills/automation-preview/SKILL.md` | Independent Session Replay (Intended Peer Verifier: Poojhaa K) | **READY FOR PEER VERIFICATION** |
+| **A12** | Fresh-session independent evaluation via `skills/automation-preview/SKILL.md` | Independent Session Replay | **PASS** |
 
 See [`docs/architecture/acceptance-matrix.md`](docs/architecture/acceptance-matrix.md) for complete command transcripts and outputs.
 
