@@ -351,13 +351,13 @@ WorkloadLens was engineered, tested, verified, and deployed by **Team Code Sapie
 
 ### Team and Contributions
 
-#### **Poojhaa K**
+#### **[Poojhaa K](https://github.com/Poojhaakarthikeyan)**
 *Team Lead & Technical Coordination*  
 Directs overall project delivery, milestone governance, team synchronization, and architectural alignment with UC-05 specifications.
 * **Project Governance & Delivery:** Coordinates milestones, task delegation, review cadences, and cross-functional synchronization between engineering, quality assurance, and deployment streams.
 * **Specification & Architecture Alignment:** Oversees compliance with UC-05 challenge standards, including R1–R4 batch validation constraints, tenant isolation boundaries, and daily quota limits.
 * **Quality & Integration Review:** Coordinates delivery reviews and serves as designated peer verifier for acceptance check A12 independent fresh-session replay (*pending independent execution*).
-* **GitHub:** Confirmation pending (*supplied handle `Govindharaju_1951` returned HTTP 404; pending team confirmation*).
+* **GitHub:** [@Poojhaakarthikeyan](https://github.com/Poojhaakarthikeyan) *(verified profile)*
 
 ---
 
