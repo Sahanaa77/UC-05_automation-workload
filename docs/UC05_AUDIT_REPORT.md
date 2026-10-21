@@ -85,7 +85,10 @@ The six required routes are registered at their exact specification paths:
 
 ---
 
-## 3. Teammate Fresh-Session Replay Checklist (A12)
+## 3. Teammate Fresh-Session Replay Checklist (A12 — Peer Verifier: Poojhaa K)
+
+**Intended Peer Verifier:** Poojhaa K (`Govindharaju_1951`, pending profile URL verification).  
+**Privacy Safeguard:** No personal credentials, passwords, or private access tokens are required or permitted to be logged. Replay operations utilize standard test fixture identity tokens (`token-tenant-a-operator`) as detailed below.
 
 To complete check A12 in an independent session:
 

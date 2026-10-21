@@ -308,7 +308,7 @@ terraform -chdir=infra validate
 
 ## 12. Acceptance Criteria and Evidence
 
-All twelve official acceptance checks are fully verified:
+A01–A11 automated and live cloud checks are fully verified (**PASS**); A12 is documented and prepared for independent teammate evaluation:
 
 | Check | Description | Verification Scope | Status |
 |:---:|---|---|:---:|
@@ -323,7 +323,7 @@ All twelve official acceptance checks are fully verified:
 | **A09** | Idempotency replay returns 200 with 0 quota debit; changed payload returns 409 | Live Cloud + Pytest | **PASS** |
 | **A10** | Suspended subscription rejects new runs (403); historical reads permitted | Live Cloud + Pytest | **PASS** |
 | **A11** | Processing failure hook sets Failed status, consumes 1 slot, replay returns Failed | Local Pytest + Cloud | **PASS** |
-| **A12** | Fresh-session independent evaluation via `skills/automation-preview/SKILL.md` | Independent Session Replay | **PASS** |
+| **A12** | Fresh-session independent evaluation via `skills/automation-preview/SKILL.md` | Independent Session Replay (Intended Peer Verifier: Poojhaa K) | **READY FOR PEER VERIFICATION** |
 
 See [`docs/architecture/acceptance-matrix.md`](docs/architecture/acceptance-matrix.md) for complete command transcripts and outputs.
 
@@ -350,6 +350,7 @@ WorkloadLens was engineered, tested, verified, and deployed by **Team Code Sapie
 ### Poojhaa K — Team Lead
 * **Leadership & Project Coordination:** Served as Team Lead, overseeing project milestones, task distribution, delivery schedules, and team synchronization across all phases of work.
 * **Requirements & Compliance Oversight:** Directed team alignment with the official UC-05 specification and acceptance criteria (A01–A12), ensuring complete coverage of validation rules, tenant isolation models, and quota requirements.
+* **Intended Peer Verifier (A12):** Designated peer verifier for acceptance check A12 fresh-session independent replay (handle provided: `Govindharaju_1951`, pending profile URL verification).
 
 ### Rohita — Documentation, Testing, and Deployment
 * **Documentation:** Authored and enhanced comprehensive project documentation, including high-level architecture designs, sequence workflows, data models, operational runbooks, and repository guides.
