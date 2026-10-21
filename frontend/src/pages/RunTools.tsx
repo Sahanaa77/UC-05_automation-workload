@@ -162,11 +162,13 @@ const CircularQuotaGauge: React.FC<{
 interface RequestTimelineStripProps {
   status: number | null
   runStatus?: 'Succeeded' | 'Failed' | string
+  operation?: 'validate' | 'process'
 }
 
 const RequestTimelineStrip: React.FC<RequestTimelineStripProps> = ({
   status,
   runStatus,
+  operation = 'validate',
 }) => {
   if (status === null) return null
 
@@ -212,7 +214,7 @@ const RequestTimelineStrip: React.FC<RequestTimelineStripProps> = ({
     { id: 2, name: 'Authorized', desc: 'Role & plan entitlement' },
     { id: 3, name: 'Validated', desc: 'Batch bounds & R1–R4' },
     { id: 4, name: 'Quota reserved', desc: 'Daily rate allocation' },
-    { id: 5, name: 'Processed', desc: 'Execution & output' },
+    { id: 5, name: operation === 'validate' ? 'Validated' : 'Processed', desc: operation === 'validate' ? 'Validation report saved' : 'Execution & output' },
   ]
 
   return (
@@ -1934,6 +1936,7 @@ export const RunTools: React.FC = () => {
               <RequestTimelineStrip
                 status={responseStatus}
                 runStatus={lastRun?.status}
+                operation={operation}
               />
             )}
 
@@ -2011,7 +2014,11 @@ export const RunTools: React.FC = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="font-bold text-sm flex items-center gap-1.5">
-                        {responseStatus === 201 && '201 Created — Run Accepted & Processed'}
+                        {responseStatus === 201 && (
+                          operation === 'validate'
+                            ? '201 Created — Validation Accepted & Recorded'
+                            : '201 Created — Workload Accepted & Processed'
+                        )}
                         {responseStatus === 200 && '200 OK — Idempotent Replay'}
                         {responseStatus === 400 && '400 Bad Request — Schema or Rule Violation'}
                         {responseStatus === 401 && '401 Unauthorized — Authentication Required'}
@@ -2039,7 +2046,9 @@ export const RunTools: React.FC = () => {
                       <span>
                         <strong>What this means: </strong>
                         {responseStatus === 201 &&
-                          'Workload was accepted into SQL, 1 quota slot debited, and execution completed.'}
+                          (operation === 'validate'
+                            ? 'Validation batch was accepted into SQL, 1 quota slot debited, and validation report saved.'
+                            : 'Workload was accepted into SQL, 1 quota slot debited, and workload preview generated.')}
                         {responseStatus === 200 &&
                           'Idempotent replay: this Idempotency-Key was previously processed. Replaying existing result with 0 quota debit.'}
                         {responseStatus === 400 &&
