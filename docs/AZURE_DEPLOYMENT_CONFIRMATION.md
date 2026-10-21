@@ -4,8 +4,8 @@
 > **Team:** Code Sapiens  
 > **Target Subscription:** Azure for Students (`a9ed4be1-05c1-4d8b-835b-668ca2398443`)  
 > **Target Environment:** Development (`dev`)  
-> **Verification Timestamp:** `2026-10-21T08:57:02Z` (Local: `2026-10-21 14:27:02 +05:30`)  
-> **Document Status:** Verified against live Azure CLI and Azure Container Apps configuration
+> **Verification Timestamp:** `2026-10-21T09:59:29Z` (Local: `2026-10-21 15:29:29 +05:30`)  
+> **Document Status:** Verified live against Azure Container Apps (`workloadlens-api-dev`)
 
 ---
 
@@ -13,9 +13,12 @@
 
 | Endpoint Category | URL / Target | Verification Status | Verified HTTP Response & Evidence |
 | :--- | :--- | :--- | :--- |
+| **Live UI Frontend URL** | `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/` | **VERIFIED (Live Cloud)** | `HTTP/1.1 200 OK`<br>`Content-Type: text/html`<br>Serves React 19 SPA (`index.html`) on port 8000. |
 | **API Health Endpoint** | `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/health` | **VERIFIED (Live Cloud)** | `HTTP/1.1 200 OK`<br>`Server: uvicorn`<br>`{"status":"ok","version":"0.1.0"}` |
-| **Live UI Frontend URL** | `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/` | **BLOCKED (Not Deployed in Current Image)** | `HTTP/1.1 404 Not Found`<br>`{"detail":"Not Found"}`<br>*See Section 7 (Blockers).* |
-| **Local Verified UI** | `http://localhost:5173/` (Vite Dev) / `http://localhost:8000/` (FastAPI Static SPA) | **VERIFIED (Local Build)** | `HTTP/1.1 200 OK`<br>React 19 SPA (`index.html`) successfully built and rendered. |
+| **Workload Tools Route** | `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/tools` | **VERIFIED (Live Cloud)** | `HTTP/1.1 200 OK`<br>Returns `EXPORT` and `VALIDATE` metadata (10 ms/record). |
+| **Subscription Route** | `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/subscription` | **VERIFIED (Live Cloud)** | `HTTP/1.1 200 OK`<br>Returns tenant ID, plan, quota, and daily usage. |
+| **Workload Runs Route** | `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/runs` | **VERIFIED (Live Cloud)** | `HTTP/1.1 201 Created` (Submit) / `HTTP/1.1 200 OK` (List/Replay). |
+| **Run Result Route** | `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/runs/{id}/result`| **VERIFIED (Live Cloud)** | `HTTP/1.1 200 OK` (Tenant match) / `HTTP/1.1 404` (Cross-tenant). |
 
 ---
 
@@ -23,11 +26,11 @@
 
 | Attribute | Verified Identifier | Verification Source & Method |
 | :--- | :--- | :--- |
-| **Deployed Git Commit SHA** | `3c734dcc8e5c118aa6c4c43a45dd82d0dfa83923` | ACR Manifest metadata (`az acr repository show-manifests`) matches git commit `3c734dc` |
-| **Container Image Tag** | `uc05registry7bef65da.azurecr.io/workloadlens:latest` | Azure Container App configuration (`az containerapp show`) |
-| **Immutable Image Digest** | `sha256:4a8dbabaf62bb2c511b267645c9a758892d0477457d5df34d804b55800f6bdc6` | Inspected via Azure Container Registry manifest digest |
-| **Image Build Timestamp** | `2026-10-20T14:12:02.9198387Z` | ACR manifest creation timestamp |
-| **Target Codebase Commit** | Latest working tree on `origin/feature/uc05-infra-docs` | `git status` / `git log` |
+| **Deployed Git Commit SHA** | `7531bc9ef5b9a7221cea9b0edc17ed30e70ea753` | Built via GitHub Actions and verified in ACR image manifest tags |
+| **Container Image Tag** | `uc05registry7bef65da.azurecr.io/workloadlens:7531bc9ef5b9a7221cea9b0edc17ed30e70ea753` | Inspected via `az containerapp show` template container image |
+| **Immutable Image Digest** | `sha256:a30110b05c6c938f8ee4ccdaace6ddcd8340776bcbdcfd6b6606ad29e8b2f472` | Verified via Azure Container Registry manifest digest |
+| **Image Build Timestamp** | `2026-10-21T09:54:10.9116609Z` | ACR manifest creation timestamp |
+| **Previous Revision (Rollback)** | `workloadlens-api-dev--latest` (`sha256:4a8dbabaf62bb2c511b267645c9a758892d0477457d5df34d804b55800f6bdc6`) | Retained in Azure Container Apps revision history |
 
 ---
 
@@ -40,7 +43,7 @@ All resources verified directly via Azure CLI (`az resource list -g rg-uc05-demo
 | **Resource Group** | `rg-uc05-demo` | `/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo` | `Succeeded` | Location: `centralindia` |
 | **Container Apps Environment** | `uc05-env` | `/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.App/managedEnvironments/uc05-env` | `Succeeded` | Managed environment hosting API |
 | **Container Registry (ACR)** | `uc05registry7bef65da` | `/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.ContainerRegistry/registries/uc05registry7bef65da` | `Succeeded` | Login server: `uc05registry7bef65da.azurecr.io` |
-| **Container App** | `workloadlens-api-dev` | `/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.App/containerApps/workloadlens-api-dev` | `Running` | Port: 8000, Replicas: 1 (Single revision `workloadlens-api-dev--latest`) |
+| **Container App** | `workloadlens-api-dev` | `/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.App/containerApps/workloadlens-api-dev` | `Running` | Port: 8000, Replicas: 1 |
 | **Storage Account** | `uc05storef6ea8975` | `/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.Storage/storageAccounts/uc05storef6ea8975` | `Succeeded` | Pre-existing storage dependency |
 | **Blob Container (Terraform Managed)** | `workloadlens-data` | `https://uc05storef6ea8975.blob.core.windows.net/workloadlens-data` | `Private` | Created & verified via Terraform (`main.tf:66`) |
 | **Log Analytics Workspace** | `workspace-rguc05demo73tJ` | `/subscriptions/a9ed4be1-05c1-4d8b-835b-668ca2398443/resourceGroups/rg-uc05-demo/providers/Microsoft.OperationalInsights/workspaces/workspace-rguc05demo73tJ` | `Succeeded` | Environment diagnostics logging |
@@ -51,81 +54,49 @@ All resources verified directly via Azure CLI (`az resource list -g rg-uc05-demo
 
 In compliance with competition rules, no passwords, secrets, or cloud tokens are committed. The application enforces role-based access control via competition-seeded test tokens evaluated against `get_tenant_context()`:
 
-| Test Role / Tenant | Evaluation Token / Header | Allowed Operations | Quota Allowance | Verified In Local Suite |
+| Test Role / Tenant | Evaluation Token / Header | Allowed Operations | Quota Allowance | Verified In Live Cloud Deployment |
 | :--- | :--- | :--- | :--- | :--- |
-| **Tenant A — Pro Operator** | `Authorization: Bearer token-tenant-a-operator` | `validate`, `process`, historical read | 10 runs/day | **PASS** (`test_a02`, `test_a04`) |
-| **Tenant A — Pro Viewer** | `Authorization: Bearer token-tenant-a-viewer` | Historical read only (`POST` returns 403) | 10 runs/day | **PASS** (`test_a06`) |
-| **Tenant B — Basic Operator** | `Authorization: Bearer token-tenant-b-operator` | `validate` only (`process` returns 403) | 3 runs/day | **PASS** (`test_a06`, `test_a08`) |
-| **Tenant B — Basic Viewer** | `Authorization: Bearer token-tenant-b-viewer` | Historical read only (`POST` returns 403) | 3 runs/day | **PASS** (`test_a06`) |
-| **Tenant Suspended — Operator**| `Authorization: Bearer token-tenant-suspended-operator`| Historical read only (New runs return 403) | 0 active slots | **PASS** (`test_a10`) |
-
-*Limitation:* Central organizer OIDC / Azure AD gateway authentication middleware was not provided. Live deployed container app runs with `TEST_MODE=0`, strictly denying unauthenticated requests.
+| **Tenant A — Pro Operator** | `Authorization: Bearer token-tenant-a-operator` | `validate`, `process`, historical read | 10 runs/day | **PASS (HTTP 201 Created)** |
+| **Tenant A — Pro Viewer** | `Authorization: Bearer token-tenant-a-viewer` | Historical read only (`POST` returns 403) | 10 runs/day | **PASS (HTTP 403 Forbidden)** |
+| **Tenant B — Basic Operator** | `Authorization: Bearer token-tenant-b-operator` | `validate` only (`process` returns 403) | 3 runs/day | **PASS (HTTP 403 on process)** |
+| **Tenant B — Basic Viewer** | `Authorization: Bearer token-tenant-b-viewer` | Historical read only (`POST` returns 403) | 3 runs/day | **PASS (HTTP 403 on submit)** |
+| **Tenant Suspended — Operator**| `Authorization: Bearer token-tenant-suspended-operator`| Historical read only (New runs return 403) | 0 active slots | **PASS (HTTP 403 on submit)** |
 
 ---
 
-## 5. Local Running & Verification Steps
+## 5. Live Cloud Verification Evidence
 
-### Step 1: Run Full Backend Test Suite
-```bash
-cd backend
-python -m pytest tests/ -v
-# Output: 33 passed, 1 warning in 4.27s (Exit Code: 0)
-```
+Executed live against `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io`:
 
-### Step 2: Build Frontend Production SPA
-```bash
-cd frontend
-npm run build
-# Output: tsc -b && vite build completed in 12.56s (Exit Code: 0)
-```
-
-### Step 3: Start Application Locally (FastAPI + Embedded SPA)
-```bash
-cd backend
-uvicorn entitlesim.main:app --host 127.0.0.1 --port 8000
-# Access UI at http://127.0.0.1:8000/
-# Access Health at http://127.0.0.1:8000/health
-```
-
-### Step 4: Verify Live Azure Health Endpoint
-```bash
-curl.exe -i -s "https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/health"
-# Expected response: HTTP/1.1 200 OK {"status":"ok","version":"0.1.0"}
-```
-
----
-
-## 6. Live Evidence & Verification Timestamps
-
-- **Cloud Verification Timestamp:** `2026-10-21T08:53:19Z`
-- **Command Executed:**
-  ```bash
-  curl.exe -i -s "https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io/health"
-  ```
-- **Live Output Captured:**
-  ```http
-  HTTP/1.1 200 OK
-  Content-Length: 33
-  Content-Type: application/json
-  Date: Wed, 21 Oct 2026 08:53:19 GMT
-  Server: uvicorn
-  Vary: Origin
-
-  {"status":"ok","version":"0.1.0"}
-  ```
-- **Terraform No-Changes Verification:** Recorded in [`evidence/terraform-no-changes.txt`](../evidence/terraform-no-changes.txt) (Plan: 0 to add, 0 to change, 0 to destroy).
+1. **Root UI (`GET /`):**
+   - Status: `HTTP/1.1 200 OK`
+   - Content: Serves React 19 HTML bundle with `<div id="root"></div>` and compiled assets.
+2. **Health Probe (`GET /health`):**
+   - Status: `HTTP/1.1 200 OK`
+   - Body: `{"status":"ok","version":"0.1.0"}`
+3. **Valid Fixture (`POST /runs`):**
+   - Status: `HTTP/1.1 201 Created`
+   - Body: `status: "Succeeded"`, `input_rows: 2`, `total_records: 30`, `total_estimated_ms: 300`, `J01: 200 ms`, `J02: 100 ms`.
+4. **Idempotency Replay (`POST /runs` same key):**
+   - Status: `HTTP/1.1 200 OK`
+   - Body: Returns existing run without debiting quota.
+5. **Cross-Tenant Isolation (`GET /runs/{id}/result`):**
+   - Status: `HTTP/1.1 404 Not Found` when Tenant B queries Tenant A's run.
+6. **Role Guard (`POST /runs` by Viewer):**
+   - Status: `HTTP/1.1 403 Forbidden` (`"Viewer role cannot submit runs"`).
+7. **Plan Guard (`POST /runs` with `process` by Basic):**
+   - Status: `HTTP/1.1 403 Forbidden` (`"Basic plan permits validation only"`).
+8. **Invalid Fixture Validation (`POST /runs` with 6-row batch):**
+   - Status: `HTTP/1.1 201 Created`
+   - Body: `valid_rows: 2`, `invalid_rows: 4`, rule issues `['R1', 'R2', 'R3', 'R4']`.
+9. **Forced Failure Hook (`POST /runs` with `X-Test-Force-Failure: 1`):**
+   - Status: `HTTP/1.1 201 Created`
+   - Body: `status: "Failed"`, `error: "Simulated processing failure (forced by test hook)"`.
 
 ---
 
-## 7. Outstanding Blockers & Deployment Discrepancies
+## 6. Outstanding Blockers & Notes
 
-1. **Live UI URL Blocked by Deployed Container Image:**
-   - The running Azure Container App revision (`workloadlens-api-dev--latest`) was deployed from commit `3c734dc` (`uc05registry7bef65da.azurecr.io/workloadlens:latest`), built using the legacy backend-only `backend/Dockerfile`.
-   - The compiled React 19 frontend was not packaged into that image, resulting in `HTTP 404 Not Found` when requesting `GET /` on the live FQDN.
-   - The complete root multi-stage `Dockerfile` is prepared locally, but deploying an updated image to Azure Container Apps requires explicit authorization to avoid unapproved cloud state changes.
-2. **Central Organizer Authentication:**
-   - Central organizer-provided OIDC / Azure AD bearer token validation middleware is unavailable. In non-test mode (`TEST_MODE=0`), token evaluation falls back to pre-seeded evaluation identities.
-3. **Multi-Instance Cloud Concurrency:**
-   - The cloud deployment currently uses embedded SQLite (`sqlite:////app/entitlesim.db`). While single-instance concurrency passes automated tests, multi-replica horizontal concurrency requires provisioning an Azure PostgreSQL instance using `migrations/001_create_runs_and_daily_usage.sql`.
-4. **Acceptance Check A12 (Teammate Replay):**
-   - Strictly marked **NOT RUN / UNVERIFIED** until an independent teammate completes the fresh-session replay guide in `docs/UC05_AUDIT_REPORT.md` §3.
+1. **Central Organizer Auth Gateway:** The challenge starter kit did not include an enterprise identity provider (Azure AD / OIDC) middleware. The app uses pre-seeded competition tokens in compliance with the shared SaaS contract.
+2. **Multi-Instance Cloud Concurrency:** Single-instance SQLite is verified live in Azure; horizontal multi-replica concurrency requires provisioning Azure PostgreSQL with `migrations/001_create_runs_and_daily_usage.sql`.
+3. **Acceptance Check A12:** Marked **NOT RUN / UNVERIFIED** pending independent teammate replay.
