@@ -539,7 +539,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`space-y-2 pb-4 border-b border-border ${className}`}>
+    <div className={`space-y-1 pb-1 ${className}`}>
       {breadcrumbs.length > 0 && (
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted">
           {breadcrumbs.map((b, idx) => {

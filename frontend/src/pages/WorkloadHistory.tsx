@@ -72,6 +72,17 @@ function formatUtc(dateStr?: string): string {
   return d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC'
 }
 
+function formatUtcParts(dateStr?: string): { date: string; time: string } {
+  if (!dateStr) return { date: '—', time: '' }
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return { date: dateStr, time: '' }
+  const iso = d.toISOString()
+  return {
+    date: iso.slice(0, 10),
+    time: iso.slice(11, 19) + ' UTC',
+  }
+}
+
 function formatRelative(dateStr?: string): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
@@ -1124,17 +1135,17 @@ export const WorkloadHistory: React.FC = () => {
         ) : (
           <div className="overflow-x-auto">
             <table
-              className="w-full text-left text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#C5A059] rounded"
+              className="w-full text-left text-xs min-w-[560px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#C5A059] rounded"
               tabIndex={0}
               aria-label="Execution history runs table"
             >
               <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 uppercase font-semibold border-b border-slate-200 dark:border-slate-800 select-none">
                 <tr>
-                  <th className="py-3 px-3 w-10 text-center" title="Select to compare two runs">
+                  <th className="py-3 px-3 w-10 text-center whitespace-nowrap" title="Select to compare two runs">
                     <Scale className="w-3.5 h-3.5 mx-auto text-slate-400" />
                   </th>
                   <th
-                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors whitespace-nowrap"
                     onClick={() => handleSortToggle('run_id')}
                   >
                     <div className="flex items-center gap-1">
@@ -1147,7 +1158,7 @@ export const WorkloadHistory: React.FC = () => {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors whitespace-nowrap"
                     onClick={() => handleSortToggle('operation')}
                   >
                     <div className="flex items-center gap-1">
@@ -1160,7 +1171,7 @@ export const WorkloadHistory: React.FC = () => {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors whitespace-nowrap"
                     onClick={() => handleSortToggle('status')}
                   >
                     <div className="flex items-center gap-1">
@@ -1173,7 +1184,7 @@ export const WorkloadHistory: React.FC = () => {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors whitespace-nowrap"
                     onClick={() => handleSortToggle('records')}
                   >
                     <div className="flex items-center gap-1">
@@ -1186,7 +1197,7 @@ export const WorkloadHistory: React.FC = () => {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors whitespace-nowrap"
                     onClick={() => handleSortToggle('created_at')}
                   >
                     <div className="flex items-center gap-1">
@@ -1281,12 +1292,15 @@ export const WorkloadHistory: React.FC = () => {
                       </td>
 
                       {/* Created Time */}
-                      <td className="py-3 px-4">
-                        <div className="font-mono text-slate-700 dark:text-slate-300">
-                          {formatUtc(r.created_at)}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="font-mono text-xs text-slate-800 dark:text-slate-200 font-semibold">
+                          {formatUtcParts(r.created_at).date}
+                        </div>
+                        <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                          {formatUtcParts(r.created_at).time}
                         </div>
                         {r.created_at && (
-                          <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                          <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
                             <Clock className="w-3 h-3" />
                             {formatRelative(r.created_at)}
                           </div>

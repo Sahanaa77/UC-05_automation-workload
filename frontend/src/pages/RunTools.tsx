@@ -2071,14 +2071,14 @@ export const RunTools: React.FC = () => {
 
 
                 {lastRun?.run_id && (
-                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#C5A059]/15 dark:bg-[#C5A059]/20 border border-[#C5A059]/40 text-xs shadow-2xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-surface-muted border border-border text-xs shadow-2xs gap-3">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">Server-Assigned Run ID:</span>
-                      <code className="font-mono text-[#8C6D2D] dark:text-[#E2C37E] bg-white dark:bg-slate-900 px-2 py-1 rounded border border-[#C5A059]/40 font-bold select-all">
+                      <span className="font-semibold text-text">Server-Assigned Run ID:</span>
+                      <code className="font-mono text-text bg-surface px-2.5 py-1 rounded border border-border font-bold select-all">
                         {lastRun.run_id}
                       </code>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <Button
                         type="button"
                         variant="secondary"
@@ -2098,7 +2098,7 @@ export const RunTools: React.FC = () => {
                         variant="primary"
                         size="sm"
                         onClick={() => navigate(`/history?search=${lastRun.run_id}`)}
-                        className="text-xs gap-1"
+                        className="text-xs gap-1 bg-[#0F1E36] text-white hover:bg-[#152642]"
                       >
                         View in History →
                       </Button>

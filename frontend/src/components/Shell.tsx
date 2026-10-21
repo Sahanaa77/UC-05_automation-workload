@@ -301,8 +301,12 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
                 }`
               }
             >
-              <Zap className="w-4 h-4 text-[#C5A059]" />
-              <span>Run Tools</span>
+              {({ isActive }) => (
+                <>
+                  <Zap className={`w-4 h-4 ${isActive ? 'text-[#C5A059]' : 'text-[#8B9DB7]'}`} />
+                  <span>Run Tools</span>
+                </>
+              )}
             </NavLink>
             <NavLink
               to="/history"
@@ -315,8 +319,12 @@ export const Shell: React.FC<{ children: ReactNode }> = ({ children }) => {
                 }`
               }
             >
-              <History className="w-4 h-4 text-[#C5A059]" />
-              <span>History</span>
+              {({ isActive }) => (
+                <>
+                  <History className={`w-4 h-4 ${isActive ? 'text-[#C5A059]' : 'text-[#8B9DB7]'}`} />
+                  <span>History</span>
+                </>
+              )}
             </NavLink>
           </nav>
 
