@@ -3,7 +3,7 @@
 > **Use Case ID:** UC-05 | **Product:** WorkloadLens (Automation Workload Preview SaaS)  
 > **Team:** Code Sapiens  
 > **Target Cloud:** `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io`  
-> **Verification Status:** 100% Verified (12/12 PASS)
+> **Verification Status:** A01–A11 Automated & Live Verified (11/11 PASS); A12 Ready for Peer Verification
 
 ---
 
@@ -22,7 +22,7 @@
 | **A09** | Idempotency Replay & Conflict Detection | Replay identical key & payload; replay same key with altered payload | Matching key & payload returns existing run with 200 OK (0 quota debit, even if quota exhausted); altered payload returns 409 Conflict. | Identical replay returns original run ID with HTTP 200 OK and 0 additional debit; altered payload returns HTTP 409 Conflict. | [`backend/tests/test_uc05_acceptance.py`](../../backend/tests/test_uc05_acceptance.py#L293)<br/>[`backend/tests/test_runs_flow.py`](../../backend/tests/test_runs_flow.py#L82) | **PASS** |
 | **A10** | Suspended Subscription Restrictions | Suspended tenant submits run; suspended tenant reads historical runs | New submissions return 403 Forbidden with 0 quota debit; historical reads (`GET /runs`) remain accessible (200 OK). | `POST /runs` returns 403 Forbidden; `GET /runs` returns 200 OK with previously accepted runs. | [`backend/tests/test_uc05_acceptance.py`](../../backend/tests/test_uc05_acceptance.py#L348)<br/>[`backend/tests/test_read_routes.py`](../../backend/tests/test_read_routes.py#L65) | **PASS** |
 | **A11** | Processing Failure Hook & Quota Lifecycle | `POST /runs` with `X-Test-Force-Failure: 1` header | Run accepted into terminal status `"Failed"`, failure error recorded, exactly 1 quota slot consumed; replay returns recorded `"Failed"` status with 200 OK without re-execution. | Run status `"Failed"`, error recorded; quota debited by 1; replay returns 200 OK with identical run ID and `"Failed"` status. | [`backend/tests/test_uc05_acceptance.py`](../../backend/tests/test_uc05_acceptance.py#L385)<br/>[`backend/tests/test_runs_flow.py`](../../backend/tests/test_runs_flow.py#L136) | **PASS** |
-| **A12** | Independent Verification via Operational Guide | Independent replay following `skills/automation-preview/SKILL.md` Section 5 | Reproducible fresh session verifies Procedures A, B, and C with genuine outputs and no failures. | Executed and verified independently; all command outputs captured and confirmed. | [`skills/automation-preview/SKILL.md`](../../skills/automation-preview/SKILL.md)<br/>[`evidence/ACCEPTANCE_EVIDENCE.md`](../../evidence/ACCEPTANCE_EVIDENCE.md#L26) | **PASS** |
+| **A12** | Independent Verification via Operational Guide | Independent replay following `skills/automation-preview/SKILL.md` Section 5 | Reproducible fresh session verifies Procedures A, B, and C with genuine outputs and no failures. | Documented reproducible operational guide and runbook in SKILL.md; prepared for peer teammate execution. | [`skills/automation-preview/SKILL.md`](../../skills/automation-preview/SKILL.md)<br/>[`evidence/ACCEPTANCE_EVIDENCE.md`](../../evidence/ACCEPTANCE_EVIDENCE.md#L26) | **READY FOR PEER VERIFICATION** |
 
 ---
 
