@@ -1,11 +1,14 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from entitlesim.db import init_db
 from entitlesim.routers import admin, counterexamples, handlers, models, runs, simulate
 from entitlesim.samples.seed import seed_sample_model
 from entitlesim.schemas import HealthResponse
+from entitlesim.workload.router import router as workload_router
 
 
 @asynccontextmanager
@@ -18,8 +21,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="EntitleSim API",
-    description="Model-Based Verification & Counterexample Engine for SaaS Entitlement Workflows",
+    title="WorkloadLens API",
+    description="Automation Workload Preview SaaS (UC-05)",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -33,23 +36,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Health endpoints
+# Health endpoints (public, exposes no tenant data)
 @app.get("/api/health", response_model=HealthResponse, tags=["health"])
 @app.get("/health", response_model=HealthResponse, tags=["health"])
 def health_check():
     return HealthResponse(status="ok", version="0.1.0")
 
 
-# Include routers
+# Mount official UC-05 WorkloadLens routes at root
+app.include_router(workload_router)
+
+# Include prototype routers under /api for backwards compatibility
 app.include_router(models.router, prefix="/api")
 app.include_router(runs.router, prefix="/api")
 app.include_router(counterexamples.router, prefix="/api")
 app.include_router(simulate.router, prefix="/api")
-app.include_router(simulate.router)
 app.include_router(handlers.router, prefix="/api")
-app.include_router(handlers.router)
 app.include_router(admin.router, prefix="/api")
-app.include_router(admin.router)
+
+# Serve frontend production bundle if present (supporting both local dev and container paths)
+candidate_paths = [
+    Path(__file__).resolve().parent.parent.parent / "frontend" / "dist",
+    Path(__file__).resolve().parent.parent / "frontend" / "dist",
+    Path("/app/frontend/dist"),
+]
+frontend_dist = next((p for p in candidate_paths if p.is_dir()), None)
+if frontend_dist:
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
 
 
 if __name__ == "__main__":

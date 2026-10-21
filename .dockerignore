@@ -1,0 +1,13 @@
+.git
+.gitignore
+.venv
+venv
+**/node_modules
+frontend/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.terraform
+*.tfstate*
+*.db
+workloadlens-handover.zip

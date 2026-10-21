@@ -17,6 +17,8 @@ import { ViolationMinimization } from './pages/ViolationMinimization'
 import { InspectStateDiff } from './pages/InspectStateDiff'
 import { FixRetest } from './pages/FixRetest'
 import { RegressionExport } from './pages/RegressionExport'
+import { RunTools } from './pages/RunTools'
+import { WorkloadHistory } from './pages/WorkloadHistory'
 
 export const AppContent: React.FC = () => {
   const [isBoundariesOpen, setIsBoundariesOpen] = useState(false)
@@ -26,18 +28,14 @@ export const AppContent: React.FC = () => {
 
   useEffect(() => {
     const path = location.pathname
-    let title = 'EntitleSim — Model-Based Verification Workbench'
-    if (path.startsWith('/dashboard')) title = 'Dashboard — EntitleSim'
-    else if (path.startsWith('/models')) title = 'Model Builder — EntitleSim'
-    else if (path.startsWith('/simulator')) title = 'Event Simulator — EntitleSim'
-    else if (path.startsWith('/verification')) {
-      if (path.includes('explore')) title = 'Bounded Exploration — EntitleSim'
-      else if (path.includes('minimize')) title = 'Violation Minimization — EntitleSim'
-      else if (path.includes('diff')) title = 'Inspect State Diff — EntitleSim'
-      else if (path.includes('fix')) title = 'Fix & Retest — EntitleSim'
-      else if (path.includes('export')) title = 'Regression Export — EntitleSim'
-      else title = 'Verification — EntitleSim'
-    } else if (path.startsWith('/reports')) title = 'Reports & Runs — EntitleSim'
+    let title = 'WorkloadLens — Automation Workload Preview SaaS (UC-05)'
+    if (path.startsWith('/tools')) title = 'Run Tools — WorkloadLens'
+    else if (path.startsWith('/history')) title = 'Execution History — WorkloadLens'
+    else if (path.startsWith('/dashboard')) title = 'Dashboard — WorkloadLens'
+    else if (path.startsWith('/models')) title = 'Model Builder — WorkloadLens'
+    else if (path.startsWith('/simulator')) title = 'Event Simulator — WorkloadLens'
+    else if (path.startsWith('/verification')) title = 'Verification — WorkloadLens'
+    else if (path.startsWith('/reports')) title = 'Reports & Runs — WorkloadLens'
     document.title = title
   }, [location.pathname])
 
@@ -58,6 +56,11 @@ export const AppContent: React.FC = () => {
         {/* Dynamic Route View */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           <Routes>
+            {/* UC-05 Standard Screens */}
+            <Route path="/tools" element={<RunTools />} />
+            <Route path="/history" element={<WorkloadHistory />} />
+
+            {/* Preserved Model Exploration Workbench Screens */}
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/models" element={<ModelDefine />} />
             <Route path="/simulator" element={<Simulator />} />
@@ -82,37 +85,32 @@ export const AppContent: React.FC = () => {
             <Route path="/fix" element={<Navigate to="/verification/fix" replace />} />
             <Route path="/export" element={<Navigate to="/verification/export" replace />} />
 
-            {/* Default root navigation */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            {/* Default root navigation points to WorkloadLens Run Tools */}
+            <Route path="/" element={<Navigate to="/tools" replace />} />
+            <Route path="*" element={<Navigate to="/tools" replace />} />
           </Routes>
         </main>
 
-        {/* Footer without "Fixed Stack..." */}
         <footer className="border-t border-border bg-surface py-3 text-xs text-muted">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
             <div>
-              <span>EntitleSim &copy; 2026 &middot; Model-Based Verification Workbench</span>
+              <span>WorkloadLens &copy; 2026 &middot; Automation Workload Preview SaaS (UC-05)</span>
             </div>
             <div>
               <button
                 onClick={() => setIsBoundariesOpen(true)}
                 className="hover:text-primary transition-colors underline-offset-2 hover:underline cursor-pointer"
               >
-                Verification Boundaries & Constraints
+                Project Boundaries &amp; Verification Rules
               </button>
             </div>
           </div>
         </footer>
       </div>
 
-      <BoundariesDialog
-        isOpen={isBoundariesOpen}
-        onClose={() => setIsBoundariesOpen(false)}
-      />
-
-      <DemoController onOpenBoundaries={() => setIsBoundariesOpen(true)} />
+      <BoundariesDialog isOpen={isBoundariesOpen} onClose={() => setIsBoundariesOpen(false)} />
       <RunHistoryDrawer />
+      <DemoController onOpenBoundaries={() => setIsBoundariesOpen(true)} />
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
@@ -127,5 +125,4 @@ export const App: React.FC = () => {
     </BrowserRouter>
   )
 }
-
 export default App

@@ -8,9 +8,11 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Integer,
     JSON,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
@@ -81,15 +83,40 @@ class RunRecord(Base):
     __tablename__ = "runs"
 
     id = Column(GUID, primary_key=True, default=lambda: str(uuid.uuid4()))
-    model_id = Column(GUID, ForeignKey("models.id"), nullable=False)
-    bounds = Column(JSONType, nullable=False)
-    fixed = Column(Boolean, default=False, nullable=False)
+    model_id = Column(GUID, ForeignKey("models.id"), nullable=True)
+    bounds = Column(JSONType, nullable=True)
+    fixed = Column(Boolean, default=False, nullable=True)
     stats = Column(JSONType, nullable=True)
     status = Column(String(50), default="running", nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
+    # WorkloadLens UC-05 specific fields
+    tenant_id = Column(String(100), nullable=True, index=True)
+    idempotency_key = Column(String(100), nullable=True)
+    operation = Column(String(50), nullable=True)
+    input_fingerprint = Column(String(64), nullable=True)
+    result = Column(JSONType, nullable=True)
+    error = Column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_runs_tenant_idempotency"),
+    )
+
     model = relationship("ModelRecord", back_populates="runs")
     counterexamples = relationship("CounterexampleRecord", back_populates="run", cascade="all, delete-orphan")
+
+
+class DailyUsageRecord(Base):
+    __tablename__ = "daily_usage"
+
+    id = Column(GUID, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String(100), nullable=False, index=True)
+    utc_date = Column(String(10), nullable=False, index=True)
+    count = Column(Integer, default=0, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "utc_date", name="uq_daily_usage_tenant_date"),
+    )
 
 
 class CounterexampleRecord(Base):
