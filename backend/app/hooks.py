@@ -35,5 +35,7 @@ def check_failure_hook(request: Optional[Request] = None) -> Optional[str]:
             return "Forced failure via X-Force-Failure header"
         if request.headers.get("x-injected-failure", "").lower() in ("true", "1", "yes"):
             return "Forced failure via X-Injected-Failure header"
+        if request.headers.get("x-test-force-failure", "").lower() in ("true", "1", "yes"):
+            return "Forced failure via X-Test-Force-Failure header"
 
     return None
