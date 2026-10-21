@@ -129,16 +129,16 @@ export const WorkloadAdvisor: React.FC<{
 
     return (
       <Card
-        className={`border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/40 via-white to-slate-50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-slate-950 p-5 space-y-4 ${className}`}
+        className={`border-[#C5A059]/30 bg-surface border border-border p-5 space-y-4 ${className}`}
       >
-        <div className="flex items-center justify-between border-b border-indigo-100/70 dark:border-indigo-900/60 pb-3">
+        <div className="flex items-center justify-between border-b border-[#C5A059]/30 pb-3">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-xs">
+            <div className="p-1.5 rounded-lg bg-[#0F1E36] dark:bg-[#C5A059] text-white dark:text-[#0F1E36] shadow-xs">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Workload Advisor</h3>
-              <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+              <p className="text-[10px] font-semibold text-[#0F1E36] dark:text-[#C5A059] uppercase tracking-wider">
                 Smart insights - rule-based
               </p>
             </div>
@@ -216,16 +216,16 @@ export const WorkloadAdvisor: React.FC<{
 
     return (
       <Card
-        className={`border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/40 via-surface to-surface-muted dark:from-indigo-950/20 dark:via-surface dark:to-surface p-5 space-y-4 ${className}`}
+        className={`border-[#C5A059]/30 bg-surface border border-border p-5 space-y-4 ${className}`}
       >
-        <div className="flex items-center justify-between border-b border-indigo-100/70 dark:border-indigo-900/60 pb-3">
+        <div className="flex items-center justify-between border-b border-[#C5A059]/30 pb-3">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-xs">
+            <div className="p-1.5 rounded-lg bg-[#0F1E36] dark:bg-[#C5A059] text-white dark:text-[#0F1E36] shadow-xs">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-text">Workload Advisor</h3>
-              <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+              <p className="text-[10px] font-semibold text-[#0F1E36] dark:text-[#C5A059] uppercase tracking-wider">
                 Smart insights - rule-based
               </p>
             </div>
@@ -246,7 +246,7 @@ export const WorkloadAdvisor: React.FC<{
 
         <div className="p-3 rounded-lg bg-surface border border-border text-xs text-text-secondary space-y-1 shadow-2xs">
           <div className="flex items-center gap-1.5 font-semibold text-text">
-            <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <Clock className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
             Effort Level: {advice.effortLevel}
           </div>
           <p className="text-[11px] text-muted">{advice.effortDescription}</p>
@@ -256,10 +256,10 @@ export const WorkloadAdvisor: React.FC<{
           <div className="p-3 rounded-lg bg-surface border border-border text-xs space-y-1.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-muted uppercase tracking-wider flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <TrendingUp className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
                 Heaviest Job
               </span>
-              <span className="font-mono text-indigo-700 dark:text-indigo-400 font-bold">
+              <span className="font-mono text-[#8C6D2D] dark:text-[#E2C37E] dark:text-[#C5A059] font-bold">
                 {advice.heaviestJob.sharePercent}% of total
               </span>
             </div>
@@ -273,7 +273,7 @@ export const WorkloadAdvisor: React.FC<{
         {advice.rowsShare.length > 0 && (
           <div className="space-y-2">
             <div className="text-[11px] font-bold text-muted uppercase tracking-wider flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <Layers className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
               Share of Execution Time per Record
             </div>
             <div className="p-3 rounded-lg bg-surface border border-border space-y-2 shadow-2xs">
@@ -287,7 +287,7 @@ export const WorkloadAdvisor: React.FC<{
                   </div>
                   <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
                     <div
-                      className="bg-indigo-600 dark:bg-indigo-500 h-1.5 rounded-full"
+                      className="bg-[#0F1E36] dark:bg-[#C5A059] h-1.5 rounded-full"
                       style={{ width: `${Math.min(100, r.sharePercent)}%` }}
                     />
                   </div>
@@ -787,7 +787,7 @@ export const WorkloadHistory: React.FC = () => {
       <PageHeader
         title="Execution History"
         description={`Recorded workload runs for tenant ${activeTokenOption.tenant}.`}
-        icon={<History className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        icon={<History className="w-5 h-5 text-[#0F1E36] dark:text-[#C5A059]" />}
         breadcrumbs={[
           { label: 'WorkloadLens', href: '#/tools' },
           { label: 'Execution History' },
@@ -835,7 +835,7 @@ export const WorkloadHistory: React.FC = () => {
               Across all recorded history
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-[#C5A059]/10 dark:bg-[#C5A059]/15 text-[#0F1E36] dark:text-[#C5A059] flex items-center justify-center">
             <Layers className="w-5 h-5" />
           </div>
         </Card>
@@ -900,7 +900,7 @@ export const WorkloadHistory: React.FC = () => {
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <BarChart3 className="w-4 h-4 text-[#0F1E36] dark:text-[#C5A059]" />
               <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
                 Runs by Day (Daily Activity)
               </h3>
@@ -1036,7 +1036,7 @@ export const WorkloadHistory: React.FC = () => {
             {(statusFilter !== 'All' || operationFilter !== 'All' || searchId) && (
               <button
                 onClick={handleResetFilters}
-                className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
+                className="text-[#0F1E36] dark:text-[#C5A059] hover:underline font-semibold"
               >
                 Reset filters
               </button>
@@ -1045,8 +1045,8 @@ export const WorkloadHistory: React.FC = () => {
 
           {/* Compare Two Runs Banner */}
           {selectedForCompare.length > 0 && (
-            <div className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 py-1 px-2.5 rounded-lg">
-              <span className="text-indigo-800 dark:text-indigo-300 font-semibold">
+            <div className="flex items-center gap-2 bg-[#C5A059]/10 dark:bg-[#C5A059]/20 border border-[#C5A059]/40 dark:border-[#C5A059]/40 py-1 px-2.5 rounded-lg">
+              <span className="text-[#0F1E36] dark:text-[#E2C37E] dark:text-[#E2C37E] font-semibold">
                 {selectedForCompare.length} of 2 selected for comparison
               </span>
               <Button
@@ -1124,7 +1124,7 @@ export const WorkloadHistory: React.FC = () => {
         ) : (
           <div className="overflow-x-auto">
             <table
-              className="w-full text-left text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 rounded"
+              className="w-full text-left text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#C5A059] rounded"
               tabIndex={0}
               aria-label="Execution history runs table"
             >
@@ -1134,7 +1134,7 @@ export const WorkloadHistory: React.FC = () => {
                     <Scale className="w-3.5 h-3.5 mx-auto text-slate-400" />
                   </th>
                   <th
-                    className="py-3 px-4 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors"
                     onClick={() => handleSortToggle('run_id')}
                   >
                     <div className="flex items-center gap-1">
@@ -1147,7 +1147,7 @@ export const WorkloadHistory: React.FC = () => {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-4 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors"
                     onClick={() => handleSortToggle('operation')}
                   >
                     <div className="flex items-center gap-1">
@@ -1160,7 +1160,7 @@ export const WorkloadHistory: React.FC = () => {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-4 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors"
                     onClick={() => handleSortToggle('status')}
                   >
                     <div className="flex items-center gap-1">
@@ -1173,7 +1173,7 @@ export const WorkloadHistory: React.FC = () => {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-4 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors"
                     onClick={() => handleSortToggle('records')}
                   >
                     <div className="flex items-center gap-1">
@@ -1186,7 +1186,7 @@ export const WorkloadHistory: React.FC = () => {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-4 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-[#C5A059] dark:hover:text-[#E2C37E] transition-colors"
                     onClick={() => handleSortToggle('created_at')}
                   >
                     <div className="flex items-center gap-1">
@@ -1219,11 +1219,11 @@ export const WorkloadHistory: React.FC = () => {
                           handleOpenDrawer(r)
                         }
                       }}
-                      className={`cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-indigo-50/70 dark:focus-visible:bg-indigo-950/60 ${
+                      className={`cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-[#C5A059]/15 dark:focus-visible:bg-[#C5A059]/20 ${
                         isSelected
-                          ? 'bg-indigo-50/70 dark:bg-indigo-950/50'
+                          ? 'bg-[#C5A059]/15 dark:bg-[#C5A059]/15'
                           : isCheckedForCompare
-                          ? 'bg-indigo-50/40 dark:bg-indigo-950/30'
+                          ? 'bg-[#C5A059]/10 dark:bg-[#C5A059]/12'
                           : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40 active:bg-slate-100/60'
                       }`}
                     >
@@ -1231,11 +1231,11 @@ export const WorkloadHistory: React.FC = () => {
                       <td className="py-3 px-3 text-center" onClick={(e) => handleToggleCompare(e, r.run_id)}>
                         <button
                           type="button"
-                          className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 focus:outline-none"
+                          className="text-slate-400 hover:text-[#C5A059] dark:hover:text-[#E2C37E] focus:outline-none"
                           title={isCheckedForCompare ? 'Unselect for comparison' : 'Select for comparison'}
                         >
                           {isCheckedForCompare ? (
-                            <CheckSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                            <CheckSquare className="w-4 h-4 text-[#0F1E36] dark:text-[#C5A059]" />
                           ) : (
                             <Square className="w-4 h-4 text-slate-300 dark:text-slate-600" />
                           )}
@@ -1507,7 +1507,7 @@ export const WorkloadHistory: React.FC = () => {
                       {/* Summary Cards */}
                       <div>
                         <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                          <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          <Layers className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
                           Process Summary
                         </h3>
                         <div className="grid grid-cols-3 gap-2">
@@ -1534,7 +1534,7 @@ export const WorkloadHistory: React.FC = () => {
                       {chartData.length > 0 && (
                         <div>
                           <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <BarChart3 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                            <BarChart3 className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
                             Effort per Record (ms)
                           </h3>
                           <div className="h-40 w-full p-2 bg-slate-50/50 dark:bg-slate-800/40 rounded-lg border border-slate-200 dark:border-slate-800">
@@ -1580,7 +1580,7 @@ export const WorkloadHistory: React.FC = () => {
                       {activeDetail.result?.rows && (
                         <div className="space-y-2">
                           <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <ListOrdered className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                            <ListOrdered className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
                             Rows Table (Order Preserved)
                           </h3>
                           <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto">
@@ -1618,7 +1618,7 @@ export const WorkloadHistory: React.FC = () => {
                       {/* Counts */}
                       <div>
                         <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                          <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          <Layers className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
                           Validation Row Counts
                         </h3>
                         <div className="grid grid-cols-3 gap-2">
@@ -1640,7 +1640,7 @@ export const WorkloadHistory: React.FC = () => {
                       {/* Issues Table */}
                       <div className="space-y-2">
                         <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                          <AlertCircle className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          <AlertCircle className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
                           Validation Issues Table
                         </h3>
                         {activeDetail.result?.issues && activeDetail.result.issues.length > 0 ? (
@@ -1709,7 +1709,7 @@ export const WorkloadHistory: React.FC = () => {
           <div className="relative bg-surface rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-border space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <Scale className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <Scale className="w-5 h-5 text-[#0F1E36] dark:text-[#C5A059]" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                   Compare Two Workload Runs (Summary Diff)
                 </h3>
@@ -1729,10 +1729,10 @@ export const WorkloadHistory: React.FC = () => {
                 <thead className="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-800 font-semibold text-slate-600 dark:text-slate-300">
                   <tr>
                     <th className="py-2.5 px-4 w-1/3">Property</th>
-                    <th className="py-2.5 px-4 w-1/3 bg-indigo-50/30 dark:bg-indigo-950/20">
+                    <th className="py-2.5 px-4 w-1/3 bg-[#C5A059]/8 dark:bg-[#C5A059]/10">
                       Run A ({runA.run_id.slice(0, 8)})
                     </th>
-                    <th className="py-2.5 px-4 w-1/3 bg-purple-50/30 dark:bg-purple-950/20">
+                    <th className="py-2.5 px-4 w-1/3 bg-[#C5A059]/8 dark:bg-[#C5A059]/10">
                       Run B ({runB.run_id.slice(0, 8)})
                     </th>
                   </tr>

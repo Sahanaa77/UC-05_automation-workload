@@ -70,7 +70,6 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }
 
   const toggleTheme = () => {
-    // Cycle between Light -> Dark -> System
     if (theme === 'light') setTheme('dark')
     else if (theme === 'dark') setTheme('system')
     else setTheme('light')
@@ -97,16 +96,16 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className = '' }
     <button
       type="button"
       onClick={toggleTheme}
-      className={`p-1.5 rounded-lg border border-border text-muted hover:text-text hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none transition-colors cursor-pointer flex items-center justify-center ${className}`}
+      className={`p-1.5 rounded-md border border-border text-muted hover:text-text hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none transition-colors cursor-pointer flex items-center justify-center ${className}`}
       title={`Theme: ${theme.toUpperCase()} (${resolvedTheme} active). Click to cycle Light → Dark → System`}
       aria-label={`Toggle theme (currently ${theme})`}
     >
       {theme === 'system' ? (
         <Laptop className="w-4 h-4 text-accent" />
       ) : resolvedTheme === 'dark' ? (
-        <Moon className="w-4 h-4 text-indigo-400" />
+        <Moon className="w-4 h-4 text-gold" />
       ) : (
-        <Sun className="w-4 h-4 text-amber-500" />
+        <Sun className="w-4 h-4 text-gold-hover" />
       )}
     </button>
   )
@@ -123,7 +122,7 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 export const Card: React.FC<CardProps> = ({ children, className = '', ...props }) => {
   return (
     <div
-      className={`bg-surface border border-border text-text rounded-xl shadow-xs p-5 transition-all ${className}`}
+      className={`bg-surface border border-border text-text rounded-md shadow-2xs p-5 transition-all ${className}`}
       {...props}
     >
       {children}
@@ -132,9 +131,9 @@ export const Card: React.FC<CardProps> = ({ children, className = '', ...props }
 }
 
 // ---------------------------------------------------------------------------
-// Badge (success / warn / danger / info / default)
+// Badge (success / warn / danger / info / gold / default)
 // ---------------------------------------------------------------------------
-export type BadgeVariant = 'success' | 'warn' | 'danger' | 'info' | 'default'
+export type BadgeVariant = 'success' | 'warn' | 'danger' | 'info' | 'gold' | 'default'
 
 export interface BadgeProps {
   children: ReactNode
@@ -150,17 +149,18 @@ export const Badge: React.FC<BadgeProps> = ({
   title,
 }) => {
   const styles: Record<BadgeVariant, string> = {
-    success: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60',
-    warn: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/60',
-    danger: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/60',
-    info: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/60',
+    success: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60',
+    warn: 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60',
+    danger: 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800/60',
+    info: 'bg-[#0F1E36]/8 dark:bg-[#C5A059]/15 text-[#0F1E36] dark:text-[#E2C37E] border-[#0F1E36]/20 dark:border-[#C5A059]/30',
+    gold: 'bg-[#C5A059]/15 text-[#8C6D2D] dark:text-[#E2C37E] border-[#C5A059]/40',
     default: 'bg-surface-muted text-text-secondary border-border',
   }
 
   return (
     <span
       title={title}
-      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border ${styles[variant]} ${className}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-medium tracking-tight border ${styles[variant]} ${className}`}
     >
       {children}
     </span>
@@ -187,17 +187,17 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const base =
-    'inline-flex items-center justify-center font-medium rounded-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
+    'inline-flex items-center justify-center font-medium rounded-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer tracking-tight'
 
   const variants = {
     primary:
-      'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white shadow-xs hover:shadow-sm border border-transparent',
+      'bg-[#0F1E36] hover:bg-[#1A2E4E] active:bg-[#0A1628] text-white shadow-2xs hover:shadow-xs border border-[#0F1E36] dark:bg-[#C5A059] dark:hover:bg-[#B38D45] dark:text-[#0F1E36] dark:border-[#C5A059] font-medium',
     secondary:
-      'bg-surface hover:bg-surface-muted active:bg-surface-muted text-text border border-border shadow-xs',
+      'bg-surface hover:bg-surface-muted active:bg-surface-muted text-text border border-border shadow-2xs',
     ghost:
       'bg-transparent hover:bg-surface-muted text-text-secondary hover:text-text border border-transparent',
     danger:
-      'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs border border-transparent',
+      'bg-[#991B1B] hover:bg-[#7F1D1D] active:bg-[#661818] text-white shadow-2xs border border-transparent',
   }
 
   const sizes = {
@@ -242,7 +242,7 @@ export const Stat: React.FC<StatProps> = ({
         <div className="text-xs font-medium text-muted tracking-wide uppercase">
           {label}
         </div>
-        <div className="text-2xl font-bold text-text mt-1">{value}</div>
+        <div className="text-2xl font-serif font-semibold text-text mt-1">{value}</div>
         {subtext && <div className="text-xs text-muted mt-0.5">{subtext}</div>}
       </div>
       {icon && <div className="text-accent opacity-90">{icon}</div>}
@@ -258,7 +258,7 @@ export interface SkeletonProps {
 }
 
 export const Skeleton: React.FC<SkeletonProps> = ({ className = '' }) => {
-  return <div className={`animate-pulse bg-surface-muted rounded ${className}`} />
+  return <div className={`animate-pulse bg-surface-muted rounded-sm ${className}`} />
 }
 
 export const SkeletonCard: React.FC<{ className?: string }> = ({ className = '' }) => {
@@ -273,7 +273,7 @@ export const SkeletonCard: React.FC<{ className?: string }> = ({ className = '' 
 
 export const SkeletonTable: React.FC<{ rows?: number; cols?: number }> = ({ rows = 4, cols = 5 }) => {
   return (
-    <div className="space-y-3 p-4 bg-surface rounded-xl border border-border">
+    <div className="space-y-3 p-4 bg-surface rounded-md border border-border">
       <div className="flex gap-4 pb-2 border-b border-border">
         {Array.from({ length: cols }).map((_, i) => (
           <Skeleton key={i} className="h-4 flex-1" />
@@ -310,14 +310,14 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <div
-      className={`text-center py-12 px-4 border border-dashed border-border rounded-xl bg-surface-muted/40 ${className}`}
+      className={`text-center py-12 px-4 border border-dashed border-border rounded-md bg-surface-muted/30 ${className}`}
     >
       {icon && (
-        <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mx-auto text-muted mb-3">
+        <div className="w-10 h-10 rounded-md bg-surface-muted flex items-center justify-center mx-auto text-muted mb-3 border border-border">
           {icon}
         </div>
       )}
-      <h3 className="text-sm font-semibold text-text">{title}</h3>
+      <h3 className="text-sm font-serif font-semibold text-text">{title}</h3>
       {description && (
         <p className="text-xs text-muted mt-1 max-w-sm mx-auto">
           {description}
@@ -370,7 +370,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto p-3 rounded-lg shadow-md border text-xs flex items-start justify-between gap-2 transition-all ${
+            className={`pointer-events-auto p-3 rounded-md shadow-md border text-xs flex items-start justify-between gap-2 transition-all ${
               t.type === 'error'
                 ? 'bg-rose-50 dark:bg-rose-950/80 border-rose-200 dark:border-rose-900 text-rose-900 dark:text-rose-200'
                 : t.type === 'success'
@@ -438,18 +438,18 @@ export const Modal: React.FC<ModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F1E36]/60 backdrop-blur-2xs"
       onClick={onClose}
     >
       <div
-        className={`bg-surface border border-border rounded-xl shadow-xl ${maxWidth} w-full p-5 space-y-4 text-text`}
+        className={`bg-surface border border-border rounded-md shadow-xl ${maxWidth} w-full p-5 space-y-4 text-text`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border pb-3">
-          <h3 className="text-sm font-semibold text-text">{title}</h3>
+          <h3 className="text-sm font-serif font-semibold text-text">{title}</h3>
           <button
             onClick={onClose}
-            className="text-muted hover:text-text p-1 rounded-md focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none cursor-pointer"
+            className="text-muted hover:text-text p-1 rounded-sm focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none cursor-pointer"
             aria-label="Close modal"
           >
             <X className="w-4 h-4" />
@@ -499,9 +499,9 @@ export const Tabs: React.FC<TabsProps> = ({
             aria-controls={`tabpanel-${tab.id}`}
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(tab.id)}
-            className={`pb-2.5 text-xs font-semibold border-b-2 transition-all -mb-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-t cursor-pointer ${
+            className={`pb-2.5 text-xs font-semibold border-b-2 transition-all -mb-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-t-sm cursor-pointer ${
               isActive
-                ? 'border-accent text-accent'
+                ? 'border-[#0F1E36] dark:border-[#C5A059] text-[#0F1E36] dark:text-[#E2C37E]'
                 : 'border-transparent text-muted hover:text-text'
             }`}
           >
@@ -548,7 +548,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
               <React.Fragment key={idx}>
                 {idx > 0 && <span className="text-muted/50">/</span>}
                 {isLast || !b.href ? (
-                  <span className={isLast ? 'font-semibold text-text' : ''}>
+                  <span className={isLast ? 'font-medium text-text' : ''}>
                     {b.label}
                   </span>
                 ) : (
@@ -566,12 +566,12 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-text flex items-center gap-2.5">
-            {icon && <span className="text-accent">{icon}</span>}
+          <h1 className="text-xl md:text-2xl font-serif font-semibold tracking-tight text-text flex items-center gap-2.5">
+            {icon && <span className="text-[#C5A059]">{icon}</span>}
             {title}
           </h1>
           {description && (
-            <p className="text-xs md:text-sm text-muted mt-1">
+            <p className="text-xs md:text-sm text-muted mt-1 font-sans">
               {description}
             </p>
           )}
@@ -583,7 +583,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
 }
 
 // ---------------------------------------------------------------------------
-// WorkloadLensLogo (SVG Logo Mark matching favicon.svg)
+// WorkloadLensLogo (Contemporary Heritage SVG Mark: Deep Navy + Antique Gold)
 // ---------------------------------------------------------------------------
 export const WorkloadLensLogo: React.FC<{ className?: string; size?: number }> = ({
   className = '',
@@ -598,28 +598,21 @@ export const WorkloadLensLogo: React.FC<{ className?: string; size?: number }> =
     className={`flex-shrink-0 ${className}`}
     aria-label="WorkloadLens logo mark"
   >
-    <defs>
-      <linearGradient id="lensGradUi" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#4f46e5" />
-        <stop offset="100%" stopColor="#312e81" />
-      </linearGradient>
-      <linearGradient id="lensCheckUi" x1="10" y1="14" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="100%" stopColor="#c7d2fe" />
-      </linearGradient>
-    </defs>
-    <rect width="32" height="32" rx="8" fill="url(#lensGradUi)" />
+    {/* Deep Navy Ground */}
+    <rect width="32" height="32" rx="4" fill="#0F1E36" />
+    {/* Antique Gold Architectural Shield */}
     <path
-      d="M16 6L8 9.5V15.5C8 21 11.5 26 16 27.5C20.5 26 24 21 24 15.5V9.5L16 6Z"
-      stroke="#a5b4fc"
+      d="M16 5.5L7.5 9.5V16C7.5 21.8 11.2 26.8 16 28C20.8 26.8 24.5 21.8 24.5 16V9.5L16 5.5Z"
+      stroke="#C5A059"
       strokeWidth="1.5"
       strokeLinejoin="round"
-      fill="rgba(255, 255, 255, 0.12)"
+      fill="rgba(197, 160, 89, 0.08)"
     />
+    {/* Crisp White Verification Mark */}
     <path
-      d="M12 16.5L14.8 19.5L20.5 13.5"
-      stroke="url(#lensCheckUi)"
-      strokeWidth="2.2"
+      d="M11.5 16.5L14.5 19.5L20.5 13.5"
+      stroke="#FFFFFF"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />

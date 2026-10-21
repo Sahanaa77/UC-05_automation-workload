@@ -1185,7 +1185,7 @@ export const RunTools: React.FC = () => {
       <PageHeader
         title="Run Tools"
         description="Configure job records to preview workload validation or execute runtime estimations."
-        icon={<Zap className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        icon={<Zap className="w-5 h-5 text-[#0F1E36] dark:text-[#C5A059]" />}
         breadcrumbs={[
           { label: 'WorkloadLens', href: '#/tools' },
           { label: 'Run Tools' },
@@ -1197,9 +1197,9 @@ export const RunTools: React.FC = () => {
               variant="secondary"
               size="sm"
               onClick={() => setIsDemoDrawerOpen(true)}
-              className="gap-1.5 shadow-2xs border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/40 hover:bg-indigo-100/60 dark:hover:bg-indigo-900/60 text-[13px]"
+              className="gap-1.5 shadow-2xs border-[#C5A059]/40 text-[#8C6D2D] dark:text-[#E2C37E] bg-[#C5A059]/10 dark:bg-[#C5A059]/15 hover:bg-[#C5A059]/20 dark:hover:bg-[#C5A059]/25 text-[13px]"
             >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <Sparkles className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
               Demo Scenarios
             </Button>
           ) : undefined
@@ -1230,7 +1230,7 @@ export const RunTools: React.FC = () => {
               Role: <strong className="text-text">{activeTokenOption.role}</strong>
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-[#0F1E36]/8 dark:bg-[#C5A059]/15 text-[#0F1E36] dark:text-[#C5A059] flex items-center justify-center">
             <ShieldCheck className="w-5 h-5" />
           </div>
         </Card>
@@ -1429,15 +1429,15 @@ export const RunTools: React.FC = () => {
                 {isToolsAccordionOpen && (
                   <div className="p-4 border-t border-border space-y-4 bg-surface-muted/20">
                     {/* Part 1: Describe your jobs */}
-                    <div className="space-y-3 p-3.5 rounded-lg border border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/40 via-white to-slate-50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-slate-900">
+                    <div className="space-y-3 p-3.5 rounded-lg border border-[#C5A059]/30 bg-surface border border-border">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <Sparkles className="w-4 h-4 text-[#0F1E36] dark:text-[#C5A059]" />
                           <h4 className="text-[13px] font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                             Describe your jobs
                           </h4>
                         </div>
-                        <span className="text-[11px] font-mono px-2 py-0.5 rounded font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                        <span className="text-[11px] font-mono px-2 py-0.5 rounded font-bold bg-[#C5A059]/10 dark:bg-[#C5A059]/20 text-[#8C6D2D] dark:text-[#E2C37E] border border-[#C5A059]/40">
                           Smart builder - rule-based, runs in your browser
                         </span>
                       </div>
@@ -1451,7 +1451,7 @@ export const RunTools: React.FC = () => {
                         onChange={(e) => setJobPromptText(e.target.value)}
                         placeholder="export 500 records in stage as J10; validate 40 records in test as J11"
                         rows={2}
-                        className="w-full text-[13px] font-mono p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full text-[13px] font-mono p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#C5A059]"
                       />
 
                       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1461,9 +1461,9 @@ export const RunTools: React.FC = () => {
                           size="sm"
                           onClick={handleGenerateRows}
                           disabled={!jobPromptText.trim()}
-                          className="gap-1.5 text-[13px] text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/50"
+                          className="gap-1.5 text-[13px] text-[#8C6D2D] dark:text-[#E2C37E] border-[#C5A059]/40 hover:bg-[#C5A059]/15 dark:hover:bg-[#C5A059]/20"
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          <Sparkles className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
                           Generate rows
                         </Button>
 
@@ -1848,7 +1848,7 @@ export const RunTools: React.FC = () => {
                       type="checkbox"
                       checked={reuseLastKey}
                       onChange={(e) => setReuseLastKey(e.target.checked)}
-                      className="rounded border-slate-300 text-indigo-600 focus:ring-0"
+                      className="rounded border-slate-300 text-[#0F1E36] dark:text-[#C5A059] focus:ring-0"
                     />
                     Reuse last key (test replay)
                   </label>
@@ -1882,7 +1882,7 @@ export const RunTools: React.FC = () => {
                       type="checkbox"
                       checked={forceFailure}
                       onChange={(e) => setForceFailure(e.target.checked)}
-                      className="rounded border-slate-300 text-indigo-600 focus:ring-0"
+                      className="rounded border-slate-300 text-[#0F1E36] dark:text-[#C5A059] focus:ring-0"
                     />
                     Simulate failure (<code>X-Force-Failure: true</code>)
                   </label>
@@ -1906,7 +1906,7 @@ export const RunTools: React.FC = () => {
                   >
                     <Play className="w-3.5 h-3.5" />
                     <span>Submit Workload</span>
-                    <span className="text-[11px] opacity-75 font-mono px-1 py-0.2 bg-indigo-700/60 rounded">
+                    <span className="text-[11px] opacity-75 font-mono px-1 py-0.2 bg-[#0F1E36]/80 rounded">
                       Ctrl+↵
                     </span>
                   </Button>
@@ -1943,7 +1943,7 @@ export const RunTools: React.FC = () => {
             {isSubmitting ? (
               <Card className="p-6 space-y-4">
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <Clock className="w-4 h-4 animate-spin text-indigo-600" />
+                  <Clock className="w-4 h-4 animate-spin text-[#0F1E36] dark:text-[#C5A059]" />
                   Executing workload run on server...
                 </div>
                 <Skeleton className="h-10 w-full" />
@@ -2006,7 +2006,7 @@ export const RunTools: React.FC = () => {
                       responseStatus === 201
                         ? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300'
                         : responseStatus === 200
-                        ? 'bg-indigo-50 border-indigo-200 text-indigo-900 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300'
+                        ? 'bg-[#C5A059]/10 border-[#C5A059]/40 text-[#0F1E36] dark:text-[#E2C37E] dark:bg-[#C5A059]/15 dark:border-[#C5A059]/40 dark:text-[#E2C37E]'
                         : responseStatus === 429
                         ? 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300'
                         : 'bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300'
@@ -2071,10 +2071,10 @@ export const RunTools: React.FC = () => {
 
 
                 {lastRun?.run_id && (
-                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-xs shadow-2xs">
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#C5A059]/15 dark:bg-[#C5A059]/20 border border-[#C5A059]/40 text-xs shadow-2xs">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-slate-700 dark:text-slate-300">Server-Assigned Run ID:</span>
-                      <code className="font-mono text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-900 px-2 py-1 rounded border border-indigo-200 dark:border-indigo-800 font-bold select-all">
+                      <code className="font-mono text-[#8C6D2D] dark:text-[#E2C37E] bg-white dark:bg-slate-900 px-2 py-1 rounded border border-[#C5A059]/40 font-bold select-all">
                         {lastRun.run_id}
                       </code>
                     </div>
@@ -2184,7 +2184,7 @@ export const RunTools: React.FC = () => {
                             </div>
                             <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-lg">
                               <div className="text-[10px] font-bold text-slate-500 uppercase">Total Records</div>
-                              <div className="text-xl font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                              <div className="text-xl font-bold text-[#0F1E36] dark:text-[#C5A059] mt-0.5">
                                 {lastRun.result.summary.total_records}
                               </div>
                             </div>
@@ -2203,7 +2203,7 @@ export const RunTools: React.FC = () => {
                           <div className="p-3 bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
                             <div className="flex items-center justify-between">
                               <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                                <TrendingUp className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                                <TrendingUp className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
                                 Cumulative Runtime Progression
                               </div>
                               <span className="text-[10px] font-mono text-slate-500">
@@ -2305,7 +2305,7 @@ export const RunTools: React.FC = () => {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                              <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                              <Layers className="w-3.5 h-3.5 text-[#0F1E36] dark:text-[#C5A059]" />
                               Rows Table (Order Preserved)
                             </div>
                             <span className="text-[10px] text-slate-500 font-mono">
@@ -2390,9 +2390,9 @@ export const RunTools: React.FC = () => {
                       className="w-full px-4 py-2.5 flex items-center justify-between text-left text-[13px] font-semibold text-text hover:bg-surface-muted transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-indigo-500" />
+                        <Sparkles className="w-4 h-4 text-[#C5A059]" />
                         <span>Workload Advisor Insights</span>
-                        <span className="text-[11px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                        <span className="text-[11px] font-mono px-1.5 py-0.2 rounded bg-[#C5A059]/10 dark:bg-[#C5A059]/15 text-[#8C6D2D] dark:text-[#E2C37E] border border-[#C5A059]/40">
                           Smart suggestions
                         </span>
                       </div>
