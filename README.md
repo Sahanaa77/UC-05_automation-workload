@@ -16,7 +16,7 @@
 
 ## 1. Project Overview
 
-**WorkloadLens** is a multi-tenant Software-as-a-Service (SaaS) application that validates proposed automation jobs and generates estimated workload previews for eligible Pro subscribers. It enforces strict batch validation rules (R1–R4), guarantees cross-tenant isolation, provides atomic daily quota enforcement, and guarantees idempotent execution and history tracking across container cold restarts.
+**WorkloadLens** is a multi-tenant Software-as-a-Service (SaaS) application that validates proposed automation jobs and generates estimated workload previews for eligible Pro subscribers. It enforces strict batch validation rules (R1–R4), guarantees cross-tenant isolation, provides atomic daily quota enforcement, and maintains idempotent execution and history tracking within the active container runtime (with PostgreSQL and Blob Storage adapter hooks prepared for persistent multi-replica deployments).
 
 Built by **Team Code Sapiens** for the **UC-05 Automation Workload Preview SaaS** challenge, WorkloadLens operates as an enterprise preflight engine deployed on Microsoft Azure Container Apps, providing full lifecycle automation workload previewing.
 
@@ -121,6 +121,8 @@ The following authentic screenshots demonstrate the redesigned **Contemporary He
 
 ## 7. System Architecture
 
+The high-level system architecture illustrates the interaction between the React 19 client layer, the Azure Container Apps cloud host, the FastAPI application runtime, and data persistence layers. For detailed component specifications, sequence diagrams, and schema definitions, see [`docs/architecture/high-level-architecture.md`](docs/architecture/high-level-architecture.md).
+
 ```mermaid
 graph TD
     subgraph Client ["Client Layer (Contemporary Heritage)"]
@@ -140,7 +142,7 @@ graph TD
         Validator["Validation Engine (Rules R1, R2, R3, R4)"]
         Quota["Atomic Quota Engine (Conditional SQL Increment)"]
         Processor["Deterministic Estimator (10ms/record)"]
-        DB[("Relational Persistence<br/>• Runs Table<br/>• DailyUsage Table<br/>• Subscriptions Table")]
+        DB["Relational Persistence<br/>• Runs Table<br/>• DailyUsage Table<br/>• Subscriptions Table"]
     end
 
     SPA -->|HTTPS| Ingress
@@ -165,7 +167,7 @@ graph TD
 |---|---|---|---|
 | **Backend Runtime** | Python | 3.11+ / 3.12 | Strongly typed asynchronous backend execution. |
 | **Web Framework** | FastAPI | 0.115+ | High-performance asynchronous REST API with automatic OpenAPI validation. |
-| **Data Persistence** | SQLAlchemy + SQLite / PostgreSQL | 2.0+ | Relational mapping, ACID transaction boundaries, and conditional atomic upserts. |
+| **Data Persistence** | SQLAlchemy + SQLite / PostgreSQL | 2.0+ | Relational mapping and conditional atomic upserts. Deployed container runs single-instance embedded SQLite; external PostgreSQL supported via DATABASE_URL for multi-replica persistence. |
 | **Data Validation** | Pydantic | v2 | Strict schema parsing and type coercion prevention. |
 | **Testing** | Pytest | 8.x | Comprehensive test harness covering unit, integration, and concurrency scenarios. |
 | **Frontend Framework** | React | 19.0 | Component-driven user interface with hooks and strict state encapsulation. |
@@ -176,7 +178,7 @@ graph TD
 | **Visual Charts** | Recharts | 2.x | Responsive SVG metric and quota visualizations. |
 | **Cloud Hosting** | Azure Container Apps | Linux / Consumption | Serverless container runtime with dynamic scaling and HTTPS ingress. |
 | **Container Registry** | Azure Container Registry (ACR) | Basic SKU | Secure private container image distribution. |
-| **Blob Storage** | Azure Blob Storage | Hot Tier | Cloud-persisted run execution payloads and simulation artifacts. |
+| **Blob Storage** | Azure Blob Storage / Local Fallback | Hot Tier | Storage adapter for run payloads via private 'data' container when BLOB_ACCOUNT_URL is configured (falls back to local filesystem in dev/test). |
 | **IaC** | Terraform | 1.6+ | Declarative, idempotent provisioning of the two required Azure cloud resources. |
 
 ---
@@ -308,7 +310,7 @@ terraform -chdir=infra validate
 
 ## 12. Acceptance Criteria and Evidence
 
-All twelve official acceptance checks (A01–A12) are fully verified (**PASS**):
+Acceptance criteria A01–A12 are fully verified (**PASS**):
 
 | Check | Description | Verification Scope | Status |
 |:---:|---|---|:---:|

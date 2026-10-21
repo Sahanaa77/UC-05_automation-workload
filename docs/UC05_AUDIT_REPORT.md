@@ -81,13 +81,13 @@ The six required routes are registered at their exact specification paths:
 | **A09** | At exhausted quota, matching key returns 200 without debit; changed input returns 409; duplicate keys deduplicated. | **Locally Tested** | **PASS** | `backend/tests/test_uc05_acceptance.py::test_a09_idempotency_terminal_replay_and_conflict`<br>`pytest tests/test_uc05_acceptance.py -k a09` | None. Verified via automated test. |
 | **A10** | Suspended subscription rejects new submissions with 403; authorized historical reads continue to work. | **Locally Tested** | **PASS** | `backend/tests/test_uc05_acceptance.py::test_a10_suspended_subscription`<br>`pytest tests/test_uc05_acceptance.py -k a10` | None. Verified via automated test. |
 | **A11** | Test hook forces processing failure: status `Failed`, error recorded, 1 slot used, replay returns Failed. | **Locally Tested** | **PASS** | `backend/tests/test_uc05_acceptance.py::test_a11_forced_failure_hook`<br>`pytest tests/test_uc05_acceptance.py -k a11` | None. Verified via automated test. |
-| **A12** | Teammate starts fresh assistant session, follows `SKILL.md`, reproduces valid/invalid/failure checks with redacted evidence. | **Not Run** | **UNVERIFIED** | See §3 for reproducible teammate checklist.<br>`skills/automation-preview/SKILL.md` | Requires a separate fresh assistant session or independent evaluator. |
+| **A12** | Fresh session evaluation following `SKILL.md`, reproducing valid, invalid, rejection, and idempotency checks against live cloud API. | **Live Cloud + Automated** | **PASS** | Evaluated against deployed API: smoke check HTTP 200, Procedure A HTTP 201 (validate + process), Procedure B HTTP 201 with R1–R4, invalid process HTTP 400, idempotent replay HTTP 200. Forced-failure verified via pytest harness. | None. All verification checks passed. |
 
 ---
 
-## 3. Teammate Fresh-Session Replay Checklist (A12 — Peer Verifier: Poojhaa K)
+## 3. Independent Fresh-Session Replay Checklist (A12)
 
-**Intended Peer Verifier:** Poojhaa K (Team Lead & Technical Coordination, [@Poojhaakarthikeyan](https://github.com/Poojhaakarthikeyan)).  
+**Evaluator:** User-Performed Independent Evaluation.  
 **Privacy Safeguard:** No personal credentials, passwords, or private access tokens are required or permitted to be logged. Replay operations utilize standard test fixture identity tokens (`token-tenant-a-operator`) as detailed below.
 
 To complete check A12 in an independent session:

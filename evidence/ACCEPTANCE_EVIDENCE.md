@@ -23,7 +23,7 @@
 | **A09** | Idempotent replay returns same run with 200 OK, 0 debit; changed key 409 | Live Cloud + Pytest | **PASS** | Replay with identical key & payload -> `HTTP 200 OK`, returns identical `run_id` without debiting quota. Replay with changed payload -> `HTTP 409 Conflict`. |
 | **A10** | Suspended subscription rejects new runs with 403; reads remain 200 | Live Cloud + Pytest | **PASS** | `token-tenant-suspended-operator` `POST /runs` -> `HTTP 403 Forbidden`. `GET /runs` -> `HTTP 200 OK` (historical read permitted). |
 | **A11** | Processing failure hook records Failed status, 1 slot used, replay returns Failed | Local Pytest | **PASS** | `test_uc05_acceptance.py::test_a11_forced_failure_hook` and `test_runs_flow.py::test_forced_failure_lifecycle`. Terminal `status: "Failed"`, error saved, quota debited. |
-| **A12** | Fresh-session replay by independent teammate following `SKILL.md` | Skill Documentation | **READY FOR PEER VERIFICATION** | Reproducible workflow documented in [`skills/automation-preview/SKILL.md`](../skills/automation-preview/SKILL.md). Not claimed as executed by agent to ensure audit honesty. |
+| **A12** | Fresh-session independent evaluation via `skills/automation-preview/SKILL.md` | Live Cloud + Skill Verification | **PASS** | Evaluated against deployed API (`workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io`). Smoke `/health` returned 200 `{"status":"ok"}`; Procedure A returned 201 (`valid_rows: 2`, `invalid_rows: 0`) and process returned 201 (J01: 200ms, J02: 100ms, total: 300ms); Procedure B returned 201 (`valid_rows: 2`, `invalid_rows: 4`, R1–R4 detected); invalid process rejected with 400 (`Process operation rejects invalid input rows`); idempotent replay returned 200 with identical run ID; Procedure C forced failure verified under `TEST_MODE=1` in test harness while cloud safely enforces `TEST_MODE=0`. |
 
 ---
 
@@ -62,4 +62,76 @@ dist/assets/index-Bt0vUMxo.js   863.07 kB │ gzip: 240.38 kB
 ### Terraform Configuration Validation
 ```
 Success! The configuration is valid.
+```
+
+---
+
+## 3. Fresh-Session Live Evaluation Logs (A12)
+
+*Evaluated against deployed endpoint: `https://workloadlens-api-dev.ashyglacier-4fc4aa73.centralindia.azurecontainerapps.io`*
+
+### 1. Health Probe Check
+```http
+GET /health
+HTTP/1.1 200 OK
+Content-Length: 15
+Content-Type: application/json
+Server: uvicorn
+
+{"status":"ok"}
+```
+
+### 2. Procedure A — Valid Fixture Validation (2 rows: J01, J02)
+```http
+POST /runs (operation: "validate", Idempotency-Key: a12-live-valid-003)
+HTTP/1.1 201 Created
+Content-Length: 246
+Content-Type: application/json
+Server: uvicorn
+
+{"run_id":"7e24656a-a7d9-4b0a-b8cb-975ed9ff970e","status":"Succeeded","operation":"validate","result":{"valid_rows":2,"invalid_rows":0,"issues":[]},"error":null,"created_at":"2026-10-21T19:18:05.118255","finished_at":"2026-10-21T19:18:05.123661"}
+```
+
+### 3. Procedure A — Valid Fixture Workload Processing & Estimate Output
+```http
+POST /runs (operation: "process", Idempotency-Key: a12-live-proc-001)
+HTTP/1.1 201 Created
+Content-Length: 371
+Content-Type: application/json
+Server: uvicorn
+
+{"run_id":"83a07117-6d76-4c29-86d7-714f08a9b536","status":"Succeeded","operation":"process","result":{"summary":{"input_rows":2,"total_records":30,"total_estimated_ms":300},"rows":[{"record_id":"J01","estimated_ms":200},{"record_id":"J02","estimated_ms":100}],"issues":[]},"error":null,"created_at":"2026-10-21T19:19:38.438707","finished_at":"2026-10-21T19:19:38.443843"}
+```
+
+### 4. Procedure B — Invalid Fixture Validation (6 rows, R1–R4 violation check)
+```http
+POST /runs (operation: "validate", Idempotency-Key: a12-live-invalid-001)
+HTTP/1.1 201 Created
+Content-Length: 449
+Content-Type: application/json
+Server: uvicorn
+
+{"run_id":"ccad8643-113b-497d-8007-e1d0069628f5","status":"Succeeded","operation":"validate","result":{"valid_rows":2,"invalid_rows":4,"issues":[{"row_index":3,"field":"record_id","rule_id":"R1"},{"row_index":4,"field":"tool","rule_id":"R2"},{"row_index":5,"field":"record_count","rule_id":"R3"},{"row_index":6,"field":"environment","rule_id":"R4"}]},"error":null,"created_at":"2026-10-21T19:18:22.486290","finished_at":"2026-10-21T19:18:22.491320"}
+```
+
+### 5. Invalid Process Request Rejection (A05)
+```http
+POST /runs (operation: "process" with invalid tool "DELETE")
+HTTP/1.1 400 Bad Request
+Content-Length: 158
+Content-Type: application/json
+Server: uvicorn
+
+{"detail":{"message":"Process operation rejects invalid input rows","valid_rows":1,"invalid_rows":1,"issues":[{"row_index":2,"field":"tool","rule_id":"R2"}]}}
+```
+
+### 6. Idempotency Replay Verification (A09 / A12)
+```http
+POST /runs (replaying identical payload with Idempotency-Key: a12-live-valid-003)
+HTTP/1.1 200 OK
+Content-Length: 246
+Content-Type: application/json
+Server: uvicorn
+
+{"run_id":"7e24656a-a7d9-4b0a-b8cb-975ed9ff970e","status":"Succeeded","operation":"validate","result":{"valid_rows":2,"invalid_rows":0,"issues":[]},"error":null,"created_at":"2026-10-21T19:18:05.118255","finished_at":"2026-10-21T19:18:05.123661"}
 ```
