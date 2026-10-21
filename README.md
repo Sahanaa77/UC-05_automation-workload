@@ -301,12 +301,21 @@ See [`docs/architecture/acceptance-matrix.md`](docs/architecture/acceptance-matr
 
 ---
 
+## References and Design Rationale
+
+WorkloadLens draws upon established engineering guidance in software architecture, multitenant cloud design, formal HTTP semantics, and infrastructure-as-code standards. Core architectural mechanisms—including pure-function batch rule validation, atomic quota reservations via conditional SQL updates, strict cryptographically derived tenant boundaries, application-level idempotency replays, and bounded Terraform infrastructure—are grounded in verified industry references.
+
+For complete citations, conceptual summaries, verified application mappings, and explicit project boundaries, see [`docs/architecture/references.md`](docs/architecture/references.md).
+
+---
+
 ## Technical Documentation Sitemap
 
 * [`docs/architecture/high-level-architecture.md`](docs/architecture/high-level-architecture.md): Complete cloud and application architectural overview.
 * [`docs/architecture/sequence-diagrams.md`](docs/architecture/sequence-diagrams.md): Six Mermaid sequence diagrams for all key operational workflows.
 * [`docs/architecture/data-model.md`](docs/architecture/data-model.md): Detailed SQL schema, constraints, and ER diagram.
 * [`docs/architecture/acceptance-matrix.md`](docs/architecture/acceptance-matrix.md): Traceable A01–A12 compliance audit with evidence links.
+* [`docs/architecture/references.md`](docs/architecture/references.md): Industry references, design rationale, and project scope boundaries.
 * [`skills/automation-preview/SKILL.md`](skills/automation-preview/SKILL.md): Operational runbook and deployment guide.
 
 ---
